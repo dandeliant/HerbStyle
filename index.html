@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zdrowe Nawyki — Dziennik Postępów</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f7fa; --card:#ffffff; --ink:#1e2a35; --muted:#6b7a88;
+    --brand:#0f9d76; --brand2:#0b7c5e; --accent:#f39c12; --accent2:#e67e22;
+    --good:#1a9e4b; --bad:#d93a3a; --line:#e3e9ef; --soft:#eef4f0;
+    --blue:#2f6fb0; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+  h1,h2,h3{margin:0 0 .5em}
+  .app{max-width:1180px;margin:0 auto;padding:16px}
+
+  /* ---------- header ---------- */
+  header.top{
+    background:linear-gradient(120deg,var(--brand) 0%,var(--brand2) 60%);
+    color:#fff;border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;
+    display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;
+    box-shadow:0 6px 18px rgba(15,157,118,.25);
+  }
+  header.top h1{font-size:1.45rem;margin:0}
+  header.top .sub{opacity:.9;font-size:.9rem}
+  .daybadge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:8px 14px;font-size:.9rem;text-align:center}
+  .daybadge b{font-size:1.1rem;display:block}
+
+  /* ---------- tabs ---------- */
+  nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  nav.tabs button{
+    flex:1;min-width:140px;padding:12px 10px;border:1px solid var(--line);background:var(--card);
+    border-radius:10px;cursor:pointer;font-size:.95rem;font-weight:600;color:var(--muted);
+    transition:.15s;
+  }
+  nav.tabs button:hover{border-color:var(--brand);color:var(--brand)}
+  nav.tabs button.active{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 4px 10px rgba(15,157,118,.3)}
+  .tab{display:none}
+  .tab.active{display:block;animation:fade .2s}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ---------- cards ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;box-shadow:0 2px 6px rgba(30,42,53,.05)}
+  .card h2{font-size:1.1rem;color:var(--brand2);display:flex;align-items:center;gap:8px}
+  .card h3{font-size:.98rem;color:var(--accent2)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+
+  /* ---------- forms ---------- */
+  label.f{display:block;font-size:.8rem;color:var(--muted);font-weight:600;margin-bottom:3px}
+  input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;
+    background:#fff;color:var(--ink);font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid rgba(15,157,118,.35);border-color:var(--brand)}
+  textarea{resize:vertical;min-height:70px}
+  .btn{border:none;border-radius:9px;padding:10px 18px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.15s}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand2)}
+  .btn.orange{background:var(--accent);color:#fff}
+  .btn.orange:hover{background:var(--accent2)}
+  .btn.ghost{background:transparent;border:1px dashed var(--brand);color:var(--brand)}
+  .btn.ghost:hover{background:var(--soft)}
+  .btn.small{padding:6px 10px;font-size:.82rem}
+  .btn.danger{background:transparent;color:var(--bad);border:1px solid transparent;padding:6px 8px}
+  .btn.danger:hover{border-color:var(--bad)}
+
+  /* ---------- tables ---------- */
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  thead th{background:var(--soft);color:var(--brand2);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0}
+  .tscroll{overflow-x:auto}
+  td.num,th.num{text-align:right;white-space:nowrap}
+  .groupRow td{background:#fdf6ea;color:var(--accent2);font-weight:700;font-size:.82rem;text-transform:uppercase}
+
+  .diff{font-size:.75rem;font-weight:700;display:inline-block;margin-left:6px;padding:1px 6px;border-radius:20px;white-space:nowrap}
+  .diff.good{background:rgba(26,158,75,.12);color:var(--good)}
+  .diff.bad{background:rgba(217,58,58,.12);color:var(--bad)}
+  .diff.zero{background:#eef1f4;color:var(--muted)}
+  .goalHit{color:var(--good);font-weight:700}
+
+  /* ---------- meal sections ---------- */
+  .meal{border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+  .meal>.mhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:var(--soft);cursor:default}
+  .meal>.mhead .t{font-weight:700;color:var(--brand2)}
+  .meal>.mhead .hours{font-size:.78rem;color:var(--accent2);background:#fdf1dc;padding:2px 9px;border-radius:20px}
+  .meal>.mhead .mtot{font-size:.78rem;color:var(--muted)}
+  .meal table input[type=text]{min-width:220px}
+  .meal table input[type=number]{width:84px;text-align:right}
+  .meal table input[type=time]{width:104px}
+  .meal .addrow{padding:8px 14px}
+  @media(max-width:820px){.meal table input[type=text]{min-width:140px}}
+
+  /* ---------- progress bars ---------- */
+  .pb{margin-bottom:14px}
+  .pb .lab{display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:4px}
+  .pb .track{height:14px;background:#e8eef3;border-radius:20px;overflow:hidden}
+  .pb .fill{height:100%;border-radius:20px;transition:width .4s;background:var(--brand)}
+  .pb .fill.warn{background:var(--accent)}
+  .pb .fill.over{background:var(--bad)}
+  .improve{background:#fff5f5;border:1px solid #f3caca;border-radius:10px;padding:10px 14px;font-size:.88rem}
+  .improve.ok{background:#f0faf3;border-color:#bfe6cb}
+  .improve b{display:block;margin-bottom:4px}
+
+  .waterdots{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+  .wd{width:22px;height:28px;border-radius:4px 4px 8px 8px;border:1.5px solid var(--blue);opacity:.25;position:relative}
+  .wd.full{opacity:1;background:linear-gradient(to top,#7db9e8,#c9e4f7)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+  .kpi{background:var(--soft);border-radius:10px;padding:12px 14px;text-align:center}
+  .kpi .v{font-size:1.35rem;font-weight:800;color:var(--brand2)}
+  .kpi .l{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .kpi .s{font-size:.75rem;color:var(--muted)}
+
+  .hint{font-size:.82rem;color:var(--muted)}
+  .pill{display:inline-block;background:var(--soft);color:var(--brand2);border-radius:20px;padding:3px 12px;font-size:.8rem;font-weight:600}
+  .flexrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .spacer{flex:1}
+
+  .datebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .datebar input[type=date]{width:auto}
+
+  canvas{max-height:340px}
+  .chartbox{position:relative;min-height:280px}
+
+  dialog{border:none;border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,0,0,.3);padding:0;max-width:760px;width:95%}
+  dialog::backdrop{background:rgba(20,30,40,.45)}
+  dialog .dbody{padding:20px 24px;max-height:80vh;overflow-y:auto}
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+
+  /* ---------- print ---------- */
+  #printArea{display:none}
+  @media print{
+    body{background:#fff}
+    .app{display:none}
+    #printArea{display:block;font-size:12px;color:#000;padding:0 6mm}
+    #printArea h1{font-size:16px;margin:0 0 2mm}
+    #printArea table{width:100%;border-collapse:collapse;margin-bottom:3mm}
+    #printArea th,#printArea td{border:1px solid #444;padding:3px 6px;font-size:11px}
+    #printArea thead th{background:#eee}
+    #printArea .phead{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:3mm;font-size:12px}
+    #printArea .phead span{border:1px solid #444;border-radius:6px;padding:2px 10px}
+    #printArea .tot td{font-weight:700;background:#dce9f5}
+    #printArea .sec{font-weight:700;background:#f7ecd8}
+    #printArea .foot{margin-top:4mm;font-size:11px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div>
+      <h1>🌿 Zdrowe Nawyki — Dziennik Postępów</h1>
+      <div class="sub">Odżywianie · Pomiary · Statystyki · Zdrowy styl życia</div>
+    </div>
+    <div class="flexrow">
+      <div class="daybadge">Dzień nr<b id="hdrDayNr">—</b></div>
+      <div class="daybadge">Tydzień nr<b id="hdrWeekNr">—</b></div>
+      <div class="daybadge">Dziś<b id="hdrToday">—</b></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="dziennik" class="active">🍽️ Dziennik dnia</button>
+    <button data-tab="pomiary">📏 Pomiary ciała</button>
+    <button data-tab="statystyki">📈 Statystyki i wykresy</button>
+    <button data-tab="profil">⚙️ Profil i cele</button>
+  </nav>
+
+  <!-- ============ PROFIL ============ -->
+  <section class="tab" id="tab-profil">
+    <div class="card">
+      <h2>👤 Dane startowe</h2>
+      <div class="grid3">
+        <div><label class="f">Data startu</label><input type="date" id="pStartDate"></div>
+        <div><label class="f">Startowa masa ciała (kg)</label><input type="number" step="0.1" id="pStartWeight" placeholder="np. 92,5"></div>
+        <div><label class="f">Wzrost (cm) — do obliczania BMI</label><input type="number" step="0.5" id="pHeight" placeholder="np. 176"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 Dzienne zapotrzebowanie (cele dnia)</h2>
+      <div class="grid3">
+        <div><label class="f">Kalorie (kcal)</label><input type="number" id="tKcal" placeholder="np. 1800"></div>
+        <div><label class="f">Białko (g)</label><input type="number" id="tBialko" placeholder="np. 120"></div>
+        <div><label class="f">Woda (l)</label><input type="number" step="0.1" id="tWoda" placeholder="np. 3"></div>
+      </div>
+      <p class="hint">Te wartości pojawią się w podsumowaniu każdego dnia jako punkt odniesienia.</p>
+    </div>
+
+    <div class="card">
+      <h2>📐 Wartości: Start → Cel</h2>
+      <p class="hint">Uzupełnij wartości startowe oraz cele. Postęp będzie liczony względem tych liczb przy każdym nowym pomiarze.</p>
+      <div class="tscroll">
+        <table id="profileMetricsTable">
+          <thead><tr><th>Parametr</th><th class="num">Start</th><th class="num">Cel</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <br>
+      <div class="flexrow">
+        <button class="btn primary" id="saveProfileBtn">💾 Zapisz profil</button>
+        <span class="hint" id="profileSavedMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DZIENNIK ============ -->
+  <section class="tab active" id="tab-dziennik">
+    <div class="card">
+      <div class="datebar">
+        <button class="btn small ghost" id="prevDay">◀</button>
+        <input type="date" id="dayPicker">
+        <button class="btn small ghost" id="nextDay">▶</button>
+        <button class="btn small orange" id="todayBtn">Dziś</button>
+        <span class="pill" id="dayInfoPill">—</span>
+        <div class="spacer"></div>
+        <button class="btn primary" id="printBtn">🖨️ Drukuj podsumowanie dnia</button>
+      </div>
+      <div id="mealsContainer"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>🏋️ Ćwiczenia</h2>
+        <div class="tscroll"><table id="exTable">
+          <thead><tr><th>Data</th><th>Godzina</th><th>Opis / rodzaj aktywności</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <div class="addrow" style="padding-top:10px">
+          <button class="btn ghost small" id="addExBtn">＋ Dodaj ćwiczenie</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>📝 Sugestie trenera / Notatki</h2>
+        <textarea id="dayNotes" placeholder="Notatki do tego dnia, uwagi trenera, samopoczucie..."></textarea>
+      </div>
+    </div>
+
+    <div class="card" id="summaryCard">
+      <h2>📊 Podsumowanie dnia <span class="pill" id="sumDateLabel"></span></h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kKcal">0</div><div class="l">kcal</div><div class="s" id="kKcalT"></div></div>
+        <div class="kpi"><div class="v" id="kBialko">0</div><div class="l">białko (g)</div><div class="s" id="kBialkoT"></div></div>
+        <div class="kpi"><div class="v" id="kWoda">0</div><div class="l">woda (l)</div><div class="s" id="kWodaT"></div></div>
+        <div class="kpi"><div class="v" id="kPosilki">0</div><div class="l">posiłki</div><div class="s">zapisane dziś</div></div>
+      </div>
+      <div id="bars"></div>
+      <div style="margin:12px 0">
+        <label class="f">Woda — wizualnie (1 kubek = 0,25 l)</label>
+        <div class="waterdots" id="waterDots"></div>
+      </div>
+      <div class="improve" id="improveBox"></div>
+    </div>
+  </section>
+
+  <!-- ============ POMIARY ============ -->
+  <section class="tab" id="tab-pomiary">
+    <div class="card">
+      <div class="flexrow">
+        <h2 style="margin:0">📏 Pomiary ciała</h2>
+        <div class="spacer"></div>
+        <span class="pill" id="nextMeasurePill">—</span>
+        <button class="btn primary" id="newMeasureBtn">＋ Nowy pomiar</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Zalecane pomiary co <b>10 dni</b> — możesz jednak dodać pomiar w dowolnym terminie. Zmiany są porównywane z poprzednim pomiarem: <span class="diff good">▼ korzystna</span> <span class="diff bad">▲ niekorzystna</span>.</p>
+    </div>
+    <div class="card">
+      <div class="tscroll" id="measureTableWrap"></div>
+    </div>
+  </section>
+
+  <!-- ============ STATYSTYKI ============ -->
+  <section class="tab" id="tab-statystyki">
+    <div class="card">
+      <h2>📈 Postęp parametru w czasie</h2>
+      <div class="flexrow" style="margin-bottom:12px">
+        <select id="chartMetricSel" style="max-width:320px"></select>
+      </div>
+      <div class="chartbox"><canvas id="metricChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>🍽️ Dzienne spożycie — ostatnie 14 dni</h2>
+      <div class="flexrow" style="margin-bottom:12px">
+        <select id="intakeSel" style="max-width:320px">
+          <option value="kcal">Kalorie (kcal)</option>
+          <option value="bialko">Białko (g)</option>
+          <option value="woda">Woda (l)</option>
+        </select>
+      </div>
+      <div class="chartbox"><canvas id="intakeChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>🧮 Tabela postępów</h2>
+      <div class="tscroll" id="statsTableWrap"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ MODAL POMIARU ============ -->
+<dialog id="measureDialog">
+  <div class="dbody">
+    <h2 style="color:var(--brand2)">📏 Pomiar ciała</h2>
+    <div style="margin-bottom:12px;max-width:220px">
+      <label class="f">Data pomiaru</label>
+      <input type="date" id="mDate">
+    </div>
+    <h3>Masa i obwody (cm)</h3>
+    <div class="mgrid" id="mGridBody"></div>
+    <h3 style="margin-top:14px">Analiza składu ciała</h3>
+    <div class="mgrid" id="mGridComp"></div>
+    <br>
+    <div class="flexrow">
+      <button class="btn primary" id="saveMeasureBtn">💾 Zapisz pomiar</button>
+      <button class="btn ghost" id="cancelMeasureBtn">Anuluj</button>
+      <div class="spacer"></div>
+      <span class="hint">Puste pola zostaną pominięte.</span>
+    </div>
+  </div>
+</dialog>
+
+<div id="printArea"></div>
+
+<script>
+'use strict';
+/* ================= MODEL ================= */
+const LS_KEY = 'zdroweNawyki_v1';
+
+const METRICS = [
+  {key:'waga',    label:'Masa ciała',              unit:'kg', better:'down', group:'masa'},
+  {key:'szyja',   label:'Szyja',                   unit:'cm', better:'down', group:'obwody'},
+  {key:'klatka',  label:'Klatka piersiowa',        unit:'cm', better:'down', group:'obwody'},
+  {key:'ramieP',  label:'Ramię P',                 unit:'cm', better:'down', group:'obwody'},
+  {key:'ramieL',  label:'Ramię L',                 unit:'cm', better:'down', group:'obwody'},
+  {key:'talia',   label:'Talia',                   unit:'cm', better:'down', group:'obwody'},
+  {key:'brzuch',  label:'Brzuch',                  unit:'cm', better:'down', group:'obwody'},
+  {key:'biodra',  label:'Biodra',                  unit:'cm', better:'down', group:'obwody'},
+  {key:'udoP',    label:'Udo P',                   unit:'cm', better:'down', group:'obwody'},
+  {key:'udoL',    label:'Udo L',                   unit:'cm', better:'down', group:'obwody'},
+  {key:'bmi',     label:'BMI',                     unit:'',   better:'down', group:'sklad'},
+  {key:'tluszcz', label:'Tkanka tłuszczowa',       unit:'%',  better:'down', group:'sklad'},
+  {key:'miesnie', label:'Masa mięśni',             unit:'kg', better:'up',   group:'sklad'},
+  {key:'jakosc',  label:'Jakość mięśni',           unit:'',   better:'up',   group:'sklad'},
+  {key:'kosci',   label:'Masa mineralna kości',    unit:'kg', better:'up',   group:'sklad'},
+  {key:'trzewny', label:'Tłuszcz trzewny',         unit:'',   better:'down', group:'sklad'},
+  {key:'bmr',     label:'BMR — podst. przemiana materii', unit:'kcal', better:'up', group:'sklad'},
+  {key:'wiekMet', label:'Wiek metaboliczny',       unit:'lat',better:'down', group:'sklad'},
+  {key:'wodaP',   label:'Zawartość wody',          unit:'%',  better:'up',   group:'sklad'},
+];
+const GROUP_LABELS = {masa:'Masa ciała', obwody:'Pomiary — obwód (cm)', sklad:'Analiza składu ciała'};
+
+const MEALS = [
+  {key:'sniadanie',  label:'Śniadanie',    hours:'7:00 – 9:00'},
+  {key:'przekaska1', label:'Przekąska I',  hours:'10:30 – 11:30'},
+  {key:'lunch',      label:'Lunch / Obiad',hours:'13:00 – 14:30'},
+  {key:'przekaska2', label:'Przekąska II', hours:'16:00 – 17:00'},
+  {key:'kolacja',    label:'Kolacja',      hours:'18:00 – 19:30'},
+  {key:'inne',       label:'Inne',         hours:''},
+];
+
+let state = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return {
+    profile:{ startDate:'', height:null, targets:{kcal:2000,bialko:100,woda:3}, metrics:{} },
+    measurements:[],  // {id, date, values:{key:num}}
+    days:{}           // 'YYYY-MM-DD': {meals:[{id,type,time,desc,bialko,woda,kcal}], exercises:[{id,date,time,desc}], notes:''}
+  };
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ================= HELPERS ================= */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function nowTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function parseNum(v){ if(v===''||v==null) return null; const n=parseFloat(String(v).replace(',','.')); return isNaN(n)?null:n; }
+function fmt(n,dec=1){ if(n==null||isNaN(n)) return '—'; return Number(n).toLocaleString('pl-PL',{maximumFractionDigits:dec}); }
+function fmtDatePL(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
+const WEEKDAYS=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+function weekdayPL(iso){ return WEEKDAYS[new Date(iso+'T12:00:00').getDay()]; }
+function dayNumber(iso){
+  const s = state.profile.startDate;
+  if(!s) return null;
+  const diff = Math.round((new Date(iso+'T12:00:00') - new Date(s+'T12:00:00'))/86400000);
+  return diff>=0 ? diff+1 : null;
+}
+function getDay(iso){
+  if(!state.days[iso]) state.days[iso] = {meals:[],exercises:[],notes:''};
+  const d = state.days[iso];
+  if(!d.meals) d.meals=[]; if(!d.exercises) d.exercises=[]; if(d.notes==null) d.notes='';
+  return d;
+}
+function dayTotals(iso){
+  const d = state.days[iso];
+  const t = {kcal:0,bialko:0,woda:0,posilki:0};
+  if(!d) return t;
+  for(const m of d.meals){
+    t.kcal   += parseNum(m.kcal)   ?? 0;
+    t.bialko += parseNum(m.bialko) ?? 0;
+    t.woda   += parseNum(m.woda)   ?? 0;
+    if(m.desc && m.desc.trim()) t.posilki++;
+  }
+  return t;
+}
+function computeBMI(weight){
+  const h = parseNum(state.profile.height);
+  if(!h || !weight) return null;
+  return weight/((h/100)**2);
+}
+
+/* ================= TABS ================= */
+$$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  $$('nav.tabs button').forEach(x=>x.classList.remove('active'));
+  $$('.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  $('#tab-'+b.dataset.tab).classList.add('active');
+  if(b.dataset.tab==='statystyki') renderStats();
+  if(b.dataset.tab==='pomiary') renderMeasurements();
+}));
+
+/* ================= HEADER ================= */
+function renderHeader(){
+  const t = todayStr();
+  $('#hdrToday').textContent = fmtDatePL(t)+' ('+weekdayPL(t)+')';
+  const dn = dayNumber(t);
+  $('#hdrDayNr').textContent  = dn ?? '—';
+  $('#hdrWeekNr').textContent = dn ? Math.ceil(dn/7) : '—';
+}
+
+/* ================= PROFIL ================= */
+function renderProfile(){
+  $('#pStartDate').value   = state.profile.startDate || '';
+  $('#pStartWeight').value = state.profile.metrics?.waga?.start ?? '';
+  $('#pHeight').value      = state.profile.height ?? '';
+  $('#tKcal').value   = state.profile.targets.kcal   ?? '';
+  $('#tBialko').value = state.profile.targets.bialko ?? '';
+  $('#tWoda').value   = state.profile.targets.woda   ?? '';
+
+  const tb = $('#profileMetricsTable tbody');
+  tb.innerHTML='';
+  let lastGroup=null;
+  for(const m of METRICS){
+    if(m.group!==lastGroup){
+      lastGroup=m.group;
+      tb.insertAdjacentHTML('beforeend',`<tr class="groupRow"><td colspan="3">${GROUP_LABELS[m.group]}</td></tr>`);
+    }
+    const v = state.profile.metrics[m.key]||{};
+    tb.insertAdjacentHTML('beforeend',`
+      <tr>
+        <td>${m.label}${m.unit?' <span class="hint">('+m.unit+')</span>':''}</td>
+        <td class="num"><input type="number" step="0.1" style="width:110px;text-align:right" data-pm="${m.key}" data-fld="start" value="${v.start ?? ''}"></td>
+        <td class="num"><input type="number" step="0.1" style="width:110px;text-align:right" data-pm="${m.key}" data-fld="cel" value="${v.cel ?? ''}"></td>
+      </tr>`);
+  }
+}
+$('#saveProfileBtn').addEventListener('click',()=>{
+  state.profile.startDate = $('#pStartDate').value;
+  state.profile.height    = parseNum($('#pHeight').value);
+  state.profile.targets = {
+    kcal:   parseNum($('#tKcal').value),
+    bialko: parseNum($('#tBialko').value),
+    woda:   parseNum($('#tWoda').value),
+  };
+  $$('#profileMetricsTable input').forEach(inp=>{
+    const k=inp.dataset.pm, f=inp.dataset.fld;
+    if(!state.profile.metrics[k]) state.profile.metrics[k]={};
+    state.profile.metrics[k][f]=parseNum(inp.value);
+  });
+  // startowa masa z pola u góry ma priorytet, jeśli wypełniona
+  const sw = parseNum($('#pStartWeight').value);
+  if(sw!=null){ if(!state.profile.metrics.waga) state.profile.metrics.waga={}; state.profile.metrics.waga.start=sw; }
+  // auto-BMI startowe, jeśli brak
+  const bmiStart = computeBMI(state.profile.metrics?.waga?.start);
+  if(bmiStart && !(state.profile.metrics.bmi&&state.profile.metrics.bmi.start)){
+    if(!state.profile.metrics.bmi) state.profile.metrics.bmi={};
+    state.profile.metrics.bmi.start = Math.round(bmiStart*10)/10;
+  }
+  save(); renderProfile(); renderHeader(); renderDay();
+  $('#profileSavedMsg').textContent='✅ Zapisano ('+nowTime()+')';
+  setTimeout(()=>$('#profileSavedMsg').textContent='',4000);
+});
+
+/* ================= DZIENNIK ================= */
+let currentDay = todayStr();
+
+$('#dayPicker').addEventListener('change',e=>{ if(e.target.value){ currentDay=e.target.value; renderDay(); }});
+$('#prevDay').addEventListener('click',()=>shiftDay(-1));
+$('#nextDay').addEventListener('click',()=>shiftDay(1));
+$('#todayBtn').addEventListener('click',()=>{ currentDay=todayStr(); renderDay(); });
+function shiftDay(n){
+  const d=new Date(currentDay+'T12:00:00'); d.setDate(d.getDate()+n);
+  currentDay=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  renderDay();
+}
+
+function renderDay(){
+  $('#dayPicker').value=currentDay;
+  const dn=dayNumber(currentDay);
+  $('#dayInfoPill').textContent =
+    (dn?`Dzień ${dn} · Tydzień ${Math.ceil(dn/7)} · `:'') + weekdayPL(currentDay)+', '+fmtDatePL(currentDay);
+  const day=getDay(currentDay);
+
+  const cont=$('#mealsContainer'); cont.innerHTML='';
+  for(const M of MEALS){
+    const entries=day.meals.filter(m=>m.type===M.key);
+    const mt=entries.reduce((a,m)=>({k:a.k+(parseNum(m.kcal)??0),b:a.b+(parseNum(m.bialko)??0),w:a.w+(parseNum(m.woda)??0)}),{k:0,b:0,w:0});
+    const box=document.createElement('div'); box.className='meal';
+    box.innerHTML=`
+      <div class="mhead">
+        <span class="t">${M.label}</span>
+        ${M.hours?`<span class="hours">⏰ optymalnie ${M.hours}</span>`:''}
+        <span class="spacer"></span>
+        <span class="mtot">${fmt(mt.k,0)} kcal · ${fmt(mt.b)} g białka · ${fmt(mt.w,2)} l wody</span>
+      </div>
+      ${entries.length?`<div class="tscroll"><table>
+        <thead><tr><th>Czas</th><th>Co spożyto</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Kalorie (kcal)</th><th></th></tr></thead>
+        <tbody>${entries.map(e=>`
+          <tr data-id="${e.id}">
+            <td><input type="time" value="${e.time||''}" data-fld="time"></td>
+            <td><input type="text" value="${(e.desc||'').replace(/"/g,'&quot;')}" placeholder="opis posiłku..." data-fld="desc"></td>
+            <td class="num"><input type="number" step="0.1" value="${e.bialko??''}" data-fld="bialko"></td>
+            <td class="num"><input type="number" step="0.05" value="${e.woda??''}" data-fld="woda"></td>
+            <td class="num"><input type="number" step="1" value="${e.kcal??''}" data-fld="kcal"></td>
+            <td><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
+          </tr>`).join('')}
+        </tbody></table></div>`:''}
+      <div class="addrow"><button class="btn ghost small" data-add="${M.key}">＋ Dodaj pozycję</button></div>`;
+    cont.appendChild(box);
+  }
+
+  // ćwiczenia
+  const exTb=$('#exTable tbody'); exTb.innerHTML='';
+  for(const ex of day.exercises){
+    exTb.insertAdjacentHTML('beforeend',`
+      <tr data-exid="${ex.id}">
+        <td><input type="date" value="${ex.date||currentDay}" data-exfld="date" style="width:150px"></td>
+        <td><input type="time" value="${ex.time||''}" data-exfld="time" style="width:104px"></td>
+        <td><input type="text" value="${(ex.desc||'').replace(/"/g,'&quot;')}" placeholder="np. spacer 40 min, siłownia..." data-exfld="desc"></td>
+        <td><button class="btn danger small" data-exdel="${ex.id}">✕</button></td>
+      </tr>`);
+  }
+
+  $('#dayNotes').value=day.notes||'';
+  renderSummary();
+}
+
+/* delegacja zdarzeń dziennika */
+$('#mealsContainer').addEventListener('click',e=>{
+  const add=e.target.closest('[data-add]');
+  if(add){
+    const day=getDay(currentDay);
+    day.meals.push({id:uid(),type:add.dataset.add,time:nowTime(),desc:'',bialko:null,woda:null,kcal:null,createdAt:new Date().toISOString()});
+    save(); renderDay();
+    return;
+  }
+  const del=e.target.closest('[data-del]');
+  if(del){
+    const day=getDay(currentDay);
+    day.meals=day.meals.filter(m=>m.id!==del.dataset.del);
+    save(); renderDay();
+  }
+});
+$('#mealsContainer').addEventListener('input',e=>{
+  const tr=e.target.closest('tr[data-id]'); if(!tr) return;
+  const day=getDay(currentDay);
+  const m=day.meals.find(x=>x.id===tr.dataset.id); if(!m) return;
+  const f=e.target.dataset.fld;
+  m[f]=e.target.value;
+  save(); refreshMealTotals(); renderSummary();
+});
+function refreshMealTotals(){
+  const day=getDay(currentDay);
+  $$('#mealsContainer .meal').forEach((box,i)=>{
+    const M=MEALS[i];
+    const entries=day.meals.filter(m=>m.type===M.key);
+    const mt=entries.reduce((a,m)=>({k:a.k+(parseNum(m.kcal)??0),b:a.b+(parseNum(m.bialko)??0),w:a.w+(parseNum(m.woda)??0)}),{k:0,b:0,w:0});
+    box.querySelector('.mtot').textContent=`${fmt(mt.k,0)} kcal · ${fmt(mt.b)} g białka · ${fmt(mt.w,2)} l wody`;
+  });
+}
+
+$('#addExBtn').addEventListener('click',()=>{
+  const day=getDay(currentDay);
+  day.exercises.push({id:uid(),date:currentDay,time:nowTime(),desc:''});
+  save(); renderDay();
+});
+$('#exTable').addEventListener('click',e=>{
+  const del=e.target.closest('[data-exdel]'); if(!del) return;
+  const day=getDay(currentDay);
+  day.exercises=day.exercises.filter(x=>x.id!==del.dataset.exdel);
+  save(); renderDay();
+});
+$('#exTable').addEventListener('input',e=>{
+  const tr=e.target.closest('tr[data-exid]'); if(!tr) return;
+  const day=getDay(currentDay);
+  const ex=day.exercises.find(x=>x.id===tr.dataset.exid); if(!ex) return;
+  ex[e.target.dataset.exfld]=e.target.value;
+  save();
+});
+$('#dayNotes').addEventListener('input',e=>{ getDay(currentDay).notes=e.target.value; save(); });
+
+/* ---------- podsumowanie dnia ---------- */
+function barClass(pct){ return pct>115?'over':(pct<80?'warn':''); }
+function renderSummary(){
+  const t=dayTotals(currentDay);
+  const tg=state.profile.targets||{};
+  $('#sumDateLabel').textContent=weekdayPL(currentDay)+', '+fmtDatePL(currentDay);
+  $('#kKcal').textContent=fmt(t.kcal,0);
+  $('#kBialko').textContent=fmt(t.bialko);
+  $('#kWoda').textContent=fmt(t.woda,2);
+  $('#kPosilki').textContent=t.posilki;
+  $('#kKcalT').textContent  = tg.kcal  ? 'cel: '+fmt(tg.kcal,0)  : 'brak celu';
+  $('#kBialkoT').textContent= tg.bialko? 'cel: '+fmt(tg.bialko,0): 'brak celu';
+  $('#kWodaT').textContent  = tg.woda  ? 'cel: '+fmt(tg.woda,1)  : 'brak celu';
+
+  const defs=[
+    {lab:'Kalorie', v:t.kcal,  g:tg.kcal,  u:'kcal', dec:0},
+    {lab:'Białko',  v:t.bialko,g:tg.bialko,u:'g',    dec:1},
+    {lab:'Woda',    v:t.woda,  g:tg.woda,  u:'l',    dec:2},
+  ];
+  $('#bars').innerHTML=defs.map(d=>{
+    if(!d.g) return '';
+    const pct=Math.round(d.v/d.g*100);
+    return `<div class="pb">
+      <div class="lab"><span><b>${d.lab}</b> — ${fmt(d.v,d.dec)} / ${fmt(d.g,d.dec)} ${d.u}</span><span>${pct}%</span></div>
+      <div class="track"><div class="fill ${barClass(pct)}" style="width:${Math.min(pct,100)}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // woda kubki
+  const goalL = tg.woda||3;
+  const cups=Math.max(Math.round(goalL/0.25),1);
+  const full=Math.min(Math.round((t.woda)/0.25),cups);
+  $('#waterDots').innerHTML=Array.from({length:cups},(_,i)=>`<div class="wd ${i<full?'full':''}"></div>`).join('')
+    + ` <span class="hint" style="margin-left:8px">${fmt(t.woda,2)} / ${fmt(goalL,1)} l</span>`;
+
+  // do poprawy
+  const day=state.days[currentDay];
+  const issues=[];
+  if(tg.bialko && t.bialko<tg.bialko*0.9) issues.push(`Białko — brakuje ${fmt(tg.bialko-t.bialko,0)} g`);
+  if(tg.woda   && t.woda  <tg.woda*0.9)   issues.push(`Woda — brakuje ${fmt(tg.woda-t.woda,2)} l`);
+  if(tg.kcal   && t.kcal  >tg.kcal*1.1)   issues.push(`Kalorie — przekroczono o ${fmt(t.kcal-tg.kcal,0)} kcal`);
+  if(!day || !day.exercises.length)        issues.push('Ćwiczenia — brak zapisanej aktywności');
+  const box=$('#improveBox');
+  if(issues.length){
+    box.className='improve';
+    box.innerHTML='<b>🔧 Do poprawy:</b>'+issues.map(i=>'• '+i).join('<br>');
+  }else{
+    box.className='improve ok';
+    box.innerHTML='<b>🎉 Świetnie!</b> Wszystkie dzienne cele osiągnięte.';
+  }
+}
+
+/* ---------- drukowanie ---------- */
+$('#printBtn').addEventListener('click',()=>{
+  const day=getDay(currentDay);
+  const t=dayTotals(currentDay);
+  const tg=state.profile.targets||{};
+  const dn=dayNumber(currentDay);
+  let rows='';
+  for(const M of MEALS){
+    const es=day.meals.filter(m=>m.type===M.key);
+    if(!es.length) continue;
+    rows+=`<tr><td colspan="5" class="sec">${M.label}${M.hours?` (optymalnie ${M.hours})`:''}</td></tr>`;
+    rows+=es.map(e=>`<tr><td>${e.time||''}</td><td>${e.desc||''}</td><td style="text-align:right">${fmt(parseNum(e.bialko))}</td><td style="text-align:right">${fmt(parseNum(e.woda),2)}</td><td style="text-align:right">${fmt(parseNum(e.kcal),0)}</td></tr>`).join('');
+  }
+  const exRows=day.exercises.map(e=>`<tr><td>${fmtDatePL(e.date)}</td><td>${e.time||''}</td><td>${e.desc||''}</td></tr>`).join('');
+  const issues=$('#improveBox').innerText.replace(/\n/g,'<br>');
+  $('#printArea').innerHTML=`
+    <h1>🌿 Dziennik dnia — podsumowanie</h1>
+    <div class="phead">
+      <span>Dzień nr: <b>${dn??'—'}</b></span>
+      <span>Dzień tygodnia: <b>${weekdayPL(currentDay)}</b></span>
+      <span>Tydzień nr: <b>${dn?Math.ceil(dn/7):'—'}</b></span>
+      <span>Data: <b>${fmtDatePL(currentDay)}</b></span>
+    </div>
+    <table>
+      <thead><tr><th style="width:60px">Czas</th><th>Posiłek</th><th style="width:70px">Białko (g)</th><th style="width:70px">Woda (l)</th><th style="width:80px">Kalorie (kcal)</th></tr></thead>
+      <tbody>
+        ${rows||'<tr><td colspan="5">Brak zapisanych posiłków.</td></tr>'}
+        <tr class="tot"><td colspan="2">Razem:</td><td style="text-align:right">${fmt(t.bialko)}</td><td style="text-align:right">${fmt(t.woda,2)}</td><td style="text-align:right">${fmt(t.kcal,0)}</td></tr>
+        <tr class="tot"><td colspan="2">Dzienne zapotrzebowanie:</td><td style="text-align:right">${fmt(tg.bialko,0)}</td><td style="text-align:right">${fmt(tg.woda,1)}</td><td style="text-align:right">${fmt(tg.kcal,0)}</td></tr>
+      </tbody>
+    </table>
+    ${exRows?`<table><thead><tr><th colspan="3">Ćwiczenia</th></tr><tr><th>Data</th><th>Godzina</th><th>Opis</th></tr></thead><tbody>${exRows}</tbody></table>`:''}
+    ${day.notes?`<div class="foot"><b>Sugestie trenera / Notatki:</b><br>${day.notes.replace(/\n/g,'<br>')}</div>`:''}
+    <div class="foot">${issues}</div>
+  `;
+  window.print();
+});
+
+/* ================= POMIARY ================= */
+const dlg=$('#measureDialog');
+$('#newMeasureBtn').addEventListener('click',()=>{
+  $('#mDate').value=todayStr();
+  buildMeasureForm();
+  dlg.showModal();
+});
+$('#cancelMeasureBtn').addEventListener('click',()=>dlg.close());
+
+function lastMeasurementValues(){
+  const sorted=[...state.measurements].sort((a,b)=>a.date.localeCompare(b.date));
+  if(sorted.length) return sorted[sorted.length-1].values;
+  const out={};
+  for(const m of METRICS) out[m.key]=state.profile.metrics[m.key]?.start ?? null;
+  return out;
+}
+function buildMeasureForm(){
+  const lastVals=lastMeasurementValues();
+  const mk=m=>`<div><label class="f">${m.label}${m.unit?' ('+m.unit+')':''}</label>
+    <input type="number" step="0.1" data-mkey="${m.key}" placeholder="${lastVals[m.key]!=null?'ostatnio: '+fmt(lastVals[m.key]):''}"></div>`;
+  $('#mGridBody').innerHTML=METRICS.filter(m=>m.group!=='sklad').map(mk).join('');
+  $('#mGridComp').innerHTML=METRICS.filter(m=>m.group==='sklad').map(mk).join('');
+}
+$('#saveMeasureBtn').addEventListener('click',()=>{
+  const date=$('#mDate').value;
+  if(!date){ alert('Podaj datę pomiaru.'); return; }
+  const values={};
+  let any=false;
+  $$('#measureDialog [data-mkey]').forEach(inp=>{
+    const v=parseNum(inp.value);
+    if(v!=null){ values[inp.dataset.mkey]=v; any=true; }
+  });
+  if(!any){ alert('Wprowadź przynajmniej jedną wartość.'); return; }
+  // auto-BMI jeśli podano wagę a nie podano BMI
+  if(values.waga!=null && values.bmi==null){
+    const bmi=computeBMI(values.waga);
+    if(bmi) values.bmi=Math.round(bmi*10)/10;
+  }
+  const existing=state.measurements.find(x=>x.date===date);
+  if(existing){ Object.assign(existing.values,values); }
+  else state.measurements.push({id:uid(),date,values});
+  save(); dlg.close(); renderMeasurements(); renderStats();
+});
+
+function diffBadge(curr,prev,better){
+  if(curr==null||prev==null) return '';
+  const d=Math.round((curr-prev)*100)/100;
+  if(d===0) return `<span class="diff zero">＝</span>`;
+  const arrow=d>0?'▲':'▼';
+  const good=(better==='down'&&d<0)||(better==='up'&&d>0);
+  return `<span class="diff ${good?'good':'bad'}">${arrow} ${fmt(Math.abs(d),2)}</span>`;
+}
+
+function renderMeasurements(){
+  // sugerowana data następnego pomiaru
+  const sorted=[...state.measurements].sort((a,b)=>a.date.localeCompare(b.date));
+  const lastDate=sorted.length?sorted[sorted.length-1].date:(state.profile.startDate||null);
+  if(lastDate){
+    const nx=new Date(lastDate+'T12:00:00'); nx.setDate(nx.getDate()+10);
+    const nxs=nx.getFullYear()+'-'+String(nx.getMonth()+1).padStart(2,'0')+'-'+String(nx.getDate()).padStart(2,'0');
+    const overdue = nxs<=todayStr();
+    $('#nextMeasurePill').textContent=(overdue?'⏰ Czas na pomiar! (od ':'Następny pomiar: ')+fmtDatePL(nxs)+(overdue?')':'');
+    $('#nextMeasurePill').style.background=overdue?'#fdecea':'';
+    $('#nextMeasurePill').style.color=overdue?'var(--bad)':'';
+  }else $('#nextMeasurePill').textContent='Uzupełnij profil, aby zacząć';
+
+  const wrap=$('#measureTableWrap');
+  const startVals={}; for(const m of METRICS) startVals[m.key]=state.profile.metrics[m.key]?.start ?? null;
+  const goalVals={};  for(const m of METRICS) goalVals[m.key] =state.profile.metrics[m.key]?.cel   ?? null;
+
+  let html='<table><thead><tr><th>Parametr</th><th class="num">Start'+(state.profile.startDate?'<br><span style="font-weight:400">'+fmtDatePL(state.profile.startDate)+'</span>':'')+'</th>';
+  for(const ms of sorted){
+    html+=`<th class="num">${fmtDatePL(ms.date)}<br><button class="btn danger small" data-mdel="${ms.id}" title="Usuń pomiar">✕</button></th>`;
+  }
+  html+='<th class="num">🎯 Cel</th></tr></thead><tbody>';
+  let lastGroup=null;
+  for(const m of METRICS){
+    if(m.group!==lastGroup){
+      lastGroup=m.group;
+      html+=`<tr class="groupRow"><td colspan="${3+sorted.length}">${GROUP_LABELS[m.group]}</td></tr>`;
+    }
+    html+=`<tr><td>${m.label}${m.unit?' <span class="hint">('+m.unit+')</span>':''}</td>`;
+    html+=`<td class="num">${fmt(startVals[m.key])}</td>`;
+    let prev=startVals[m.key];
+    let latest=startVals[m.key];
+    for(const ms of sorted){
+      const v=ms.values[m.key];
+      if(v!=null){
+        html+=`<td class="num">${fmt(v)} ${diffBadge(v,prev,m.better)}</td>`;
+        prev=v; latest=v;
+      }else html+='<td class="num">—</td>';
+    }
+    const g=goalVals[m.key];
+    let goalCell=fmt(g);
+    if(g!=null&&latest!=null){
+      const reached=m.better==='down'?latest<=g:latest>=g;
+      if(reached) goalCell+=' <span class="goalHit">✔</span>';
+    }
+    html+=`<td class="num">${goalCell}</td></tr>`;
+  }
+  html+='</tbody></table>';
+  if(!sorted.length&&!Object.values(startVals).some(v=>v!=null)){
+    wrap.innerHTML='<p class="hint">Brak danych. Uzupełnij najpierw wartości startowe w zakładce <b>Profil i cele</b>, a potem dodawaj pomiary.</p>';
+  }else wrap.innerHTML=html;
+}
+$('#measureTableWrap').addEventListener('click',e=>{
+  const del=e.target.closest('[data-mdel]'); if(!del) return;
+  if(!confirm('Usunąć ten pomiar?')) return;
+  state.measurements=state.measurements.filter(x=>x.id!==del.dataset.mdel);
+  save(); renderMeasurements(); renderStats();
+});
+
+/* ================= STATYSTYKI ================= */
+let metricChart=null, intakeChart=null;
+
+function initStatSelectors(){
+  $('#chartMetricSel').innerHTML=METRICS.map(m=>`<option value="${m.key}">${m.label}${m.unit?' ('+m.unit+')':''}</option>`).join('');
+  $('#chartMetricSel').addEventListener('change',renderMetricChart);
+  $('#intakeSel').addEventListener('change',renderIntakeChart);
+}
+
+function renderStats(){
+  if(typeof Chart==='undefined'){
+    $('#metricChart').closest('.chartbox').innerHTML='<p class="hint">Wykresy wymagają połączenia z internetem (biblioteka Chart.js).</p>';
+    renderStatsTable(); return;
+  }
+  renderMetricChart(); renderIntakeChart(); renderStatsTable();
+}
+
+function metricSeries(key){
+  const pts=[];
+  const s=state.profile.metrics[key]?.start;
+  if(s!=null&&state.profile.startDate) pts.push({date:state.profile.startDate,v:s});
+  for(const ms of [...state.measurements].sort((a,b)=>a.date.localeCompare(b.date))){
+    if(ms.values[key]!=null) pts.push({date:ms.date,v:ms.values[key]});
+  }
+  return pts;
+}
+
+function renderMetricChart(){
+  const key=$('#chartMetricSel').value||'waga';
+  const m=METRICS.find(x=>x.key===key);
+  const pts=metricSeries(key);
+  const goal=state.profile.metrics[key]?.cel;
+  if(metricChart) metricChart.destroy();
+  metricChart=new Chart($('#metricChart'),{
+    type:'line',
+    data:{
+      labels:pts.map(p=>fmtDatePL(p.date)),
+      datasets:[
+        {label:m.label+(m.unit?' ('+m.unit+')':''),data:pts.map(p=>p.v),borderColor:'#0f9d76',backgroundColor:'rgba(15,157,118,.12)',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:'#0f9d76'},
+        ...(goal!=null?[{label:'Cel',data:pts.map(()=>goal),borderColor:'#f39c12',borderDash:[7,5],pointRadius:0,fill:false}]:[])
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:false}}}
+  });
+}
+
+function renderIntakeChart(){
+  const what=$('#intakeSel').value;
+  const labels=[],vals=[];
+  const d=new Date();
+  for(let i=13;i>=0;i--){
+    const dd=new Date(d); dd.setDate(dd.getDate()-i);
+    const iso=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+    labels.push(String(dd.getDate()).padStart(2,'0')+'.'+String(dd.getMonth()+1).padStart(2,'0'));
+    vals.push(Math.round(dayTotals(iso)[what]*100)/100);
+  }
+  const target={kcal:state.profile.targets.kcal,bialko:state.profile.targets.bialko,woda:state.profile.targets.woda}[what];
+  if(intakeChart) intakeChart.destroy();
+  intakeChart=new Chart($('#intakeChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:{kcal:'Kalorie (kcal)',bialko:'Białko (g)',woda:'Woda (l)'}[what],data:vals,backgroundColor:'rgba(47,111,176,.7)',borderRadius:6},
+      ...(target?[{type:'line',label:'Dzienne zapotrzebowanie',data:vals.map(()=>target),borderColor:'#f39c12',borderDash:[7,5],pointRadius:0}]:[])
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
+  });
+}
+
+function renderStatsTable(){
+  const wrap=$('#statsTableWrap');
+  let html=`<table><thead><tr><th>Parametr</th><th class="num">Start</th><th class="num">Ostatni pomiar</th><th class="num">Zmiana</th><th class="num">Cel</th><th class="num">Realizacja celu</th></tr></thead><tbody>`;
+  let lastGroup=null;
+  for(const m of METRICS){
+    if(m.group!==lastGroup){ lastGroup=m.group; html+=`<tr class="groupRow"><td colspan="6">${GROUP_LABELS[m.group]}</td></tr>`; }
+    const s=state.profile.metrics[m.key]?.start ?? null;
+    const g=state.profile.metrics[m.key]?.cel ?? null;
+    const pts=metricSeries(m.key);
+    const latest=pts.length?pts[pts.length-1].v:null;
+    const change=(s!=null&&latest!=null)?latest-s:null;
+    let prog='—';
+    if(s!=null&&g!=null&&latest!=null&&g!==s){
+      const pct=Math.round((latest-s)/(g-s)*100);
+      prog=pct+'%'+(pct>=100?' <span class="goalHit">✔</span>':'');
+    }
+    html+=`<tr><td>${m.label}${m.unit?' <span class="hint">('+m.unit+')</span>':''}</td>
+      <td class="num">${fmt(s)}</td><td class="num">${fmt(latest)}</td>
+      <td class="num">${change==null?'—':diffBadge(latest,s,m.better)}</td>
+      <td class="num">${fmt(g)}</td><td class="num">${prog}</td></tr>`;
+  }
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+
+/* ================= START ================= */
+initStatSelectors();
+renderHeader();
+renderProfile();
+renderDay();
+renderMeasurements();
+</script>
+</body>
+</html>
