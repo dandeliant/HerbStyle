@@ -17,3 +17,4 @@ Dane zapisują się automatycznie w pamięci przeglądarki (localStorage).
 ## Automatyczna synchronizacja
 
 Skrypt `autosync.ps1` (uruchamiany przez Harmonogram zadań Windows co 5 minut) automatycznie zatwierdza i wysyła każdą zmianę w tym folderze na GitHub.
+
