@@ -237,8 +237,10 @@
         <div><label class="f">Kalorie (kcal)</label><input type="number" id="tKcal" placeholder="np. 1800"></div>
         <div><label class="f">Białko (g)</label><input type="number" id="tBialko" placeholder="np. 120"></div>
         <div><label class="f">Woda (l)</label><input type="number" step="0.1" id="tWoda" placeholder="np. 3"></div>
+        <div><label class="f">Ruch — minuty / tydzień</label><input type="number" id="tExMin" placeholder="np. 150 (zalecenie WHO)"></div>
+        <div><label class="f">Ruch — treningi / tydzień</label><input type="number" id="tExSessions" placeholder="np. 3"></div>
       </div>
-      <p class="hint">Te wartości pojawią się w podsumowaniu każdego dnia jako punkt odniesienia.</p>
+      <p class="hint">Te wartości pojawią się w podsumowaniu każdego dnia jako punkt odniesienia. Cel ruchu jest liczony w skali tygodnia (pon.–niedz.).</p>
     </div>
 
     <div class="card">
@@ -287,21 +289,37 @@
       <div id="mealsContainer"></div>
     </div>
 
-    <div class="grid2">
-      <div class="card">
-        <h2>🏋️ Ćwiczenia</h2>
-        <div class="tscroll"><table id="exTable">
-          <thead><tr><th>Data</th><th>Godzina</th><th>Opis / rodzaj aktywności</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table></div>
-        <div class="addrow" style="padding-top:10px">
-          <button class="btn ghost small" id="addExBtn">＋ Dodaj ćwiczenie</button>
-        </div>
+    <div class="card">
+      <div class="flexrow" style="margin-bottom:10px">
+        <h2 style="margin:0">🏋️ Ćwiczenia</h2>
+        <span class="pill" id="exStreakPill" style="display:none"></span>
+        <div class="spacer"></div>
+        <button class="btn orange" id="startStopBtn">▶ Rozpocznij trening teraz</button>
       </div>
-      <div class="card">
-        <h2>📝 Sugestie trenera / Notatki</h2>
-        <textarea id="dayNotes" placeholder="Notatki do tego dnia, uwagi trenera, samopoczucie..."></textarea>
+      <div class="tscroll"><table id="exTable">
+        <thead><tr><th>Data</th><th>Start</th><th>Koniec</th><th class="num">Czas (min)</th><th>Kategoria</th><th title="Intensywność 1–5">Int.</th><th>Opis</th><th class="num">~kcal</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="addrow" style="padding-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn ghost small" id="addExBtn">＋ Dodaj ćwiczenie</button>
+        <span class="hint">Wpisz Start i Koniec — czas trwania policzy się sam. Kalorie to szacunek (MET × intensywność × Twoja waga × czas).</span>
       </div>
+      <datalist id="exCatList">
+        <option value="🚶 Spacer"></option>
+        <option value="🏃 Bieganie"></option>
+        <option value="🚴 Rower"></option>
+        <option value="🏋️ Siłownia"></option>
+        <option value="🧘 Joga / stretching"></option>
+        <option value="🏊 Pływanie"></option>
+        <option value="⚽ Sport"></option>
+        <option value="🧹 Aktywność domowa"></option>
+        <option value="✨ Inne"></option>
+      </datalist>
+    </div>
+
+    <div class="card">
+      <h2>📝 Sugestie trenera / Notatki</h2>
+      <textarea id="dayNotes" placeholder="Notatki do tego dnia, uwagi trenera, samopoczucie..."></textarea>
     </div>
 
     <div class="card" id="summaryCard">
@@ -311,12 +329,15 @@
         <div class="kpi"><div class="v" id="kBialko">0</div><div class="l">białko (g)</div><div class="s" id="kBialkoT"></div></div>
         <div class="kpi"><div class="v" id="kWoda">0</div><div class="l">woda (l)</div><div class="s" id="kWodaT"></div></div>
         <div class="kpi"><div class="v" id="kPosilki">0</div><div class="l">posiłki</div><div class="s">zapisane dziś</div></div>
+        <div class="kpi"><div class="v" id="kSpal">0</div><div class="l">🔥 spalone (kcal)</div><div class="s">ćwiczenia, szacunkowo</div></div>
+        <div class="kpi"><div class="v" id="kBilans">0</div><div class="l">bilans dnia</div><div class="s">zjedzone − spalone</div></div>
       </div>
       <div id="bars"></div>
       <div style="margin:12px 0">
         <label class="f">Woda — wizualnie (1 kubek = 0,25 l)</label>
         <div class="waterdots" id="waterDots"></div>
       </div>
+      <div id="weekActivityBox"></div>
       <div class="improve" id="improveBox"></div>
     </div>
   </section>
@@ -376,7 +397,16 @@
     </div>
 
     <div class="card">
-      <h2>⏰ Pory posiłków — ostatnie 14 dni</h2>
+      <h2>🏋️ Aktywność fizyczna</h2>
+      <div class="kpis" id="exStatsKpis"></div>
+      <div class="grid2">
+        <div><h3>Minuty ruchu / tydzień (8 tygodni)</h3><div class="chartbox" style="min-height:240px"><canvas id="exWeekChart"></canvas></div></div>
+        <div><h3>Rodzaje aktywności (30 dni)</h3><div class="chartbox" style="min-height:240px"><canvas id="exCatChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⏰ Pory posiłków i treningów — ostatnie 14 dni</h2>
       <p class="hint" id="lastMealAvg"></p>
       <div class="chartbox"><canvas id="mealTimesChart"></canvas></div>
       <p class="hint">Pomarańczowe pasma to optymalne okna posiłków. Punkty poza pasmami — zwłaszcza późne kolacje — to najczęstszy cichy sabotażysta postępów.</p>
@@ -495,6 +525,26 @@ const MEALS = [
 ];
 const MEAL_COLORS = {sniadanie:'#0f9d76',przekaska1:'#8e44ad',lunch:'#2f6fb0',przekaska2:'#d35400',kolacja:'#c0392b',inne:'#7f8c8d'};
 
+/* kategorie aktywności + wartości MET (do szacowania kalorii) */
+const EX_CATS = [
+  {label:'🚶 Spacer',            met:3.5},
+  {label:'🏃 Bieganie',          met:9},
+  {label:'🚴 Rower',             met:7},
+  {label:'🏋️ Siłownia',         met:5},
+  {label:'🧘 Joga / stretching', met:3},
+  {label:'🏊 Pływanie',          met:7},
+  {label:'⚽ Sport',             met:7},
+  {label:'🧹 Aktywność domowa',  met:3.5},
+  {label:'✨ Inne',              met:4.5},
+];
+function metFor(cat){
+  if(!cat) return 4.5;
+  const s=String(cat).toLowerCase().trim();
+  const c=EX_CATS.find(x=>x.label.toLowerCase()===s || x.label.slice(x.label.indexOf(' ')+1).toLowerCase()===s);
+  return c?c.met:4.5;
+}
+function intensFactor(i){ return {1:0.8,2:0.9,3:1,4:1.15,5:1.3}[Number(i)]||1; }
+
 let state = load();
 function load(){
   let st=null;
@@ -516,6 +566,8 @@ function load(){
   if(!st.measurements) st.measurements=[];
   if(!st.days) st.days={};
   if(!st.products) st.products=[{id:'seed1',name:'Szejk Herbalife',bialko:18,woda:0.25,kcal:220}];
+  if(st.profile.targets.exMin===undefined) st.profile.targets.exMin=150;
+  if(st.profile.targets.exSessions===undefined) st.profile.targets.exSessions=3;
   return st;
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -605,6 +657,58 @@ function computeBMI(weight){
   return weight/((h/100)**2);
 }
 function timeToHours(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); if(isNaN(h)) return null; return h+(m||0)/60; }
+/* ---------- ćwiczenia: czas trwania, kalorie, tygodnie, passa ---------- */
+function currentWeightKg(){ const pts=weightSeries(); return pts.length?pts[pts.length-1].v:70; }
+function exDurMin(ex){
+  const dm=parseNum(ex.durMin);
+  if(dm!=null) return dm;
+  const s=timeToHours(ex.time), e=timeToHours(ex.timeEnd);
+  if(s==null||e==null) return null;
+  let d=e-s; if(d<0) d+=24; // trening przez północ
+  return Math.round(d*60);
+}
+function exKcal(ex){
+  const dur=exDurMin(ex);
+  if(!dur) return null;
+  return Math.round(metFor(ex.cat)*intensFactor(ex.intens)*currentWeightKg()*dur/60);
+}
+function dayExStats(iso){
+  const d=state.days[iso];
+  const out={count:0,min:0,kcal:0};
+  if(!d||!d.exercises) return out;
+  for(const ex of d.exercises){
+    out.count++;
+    const m=exDurMin(ex);
+    if(m){ out.min+=m; out.kcal+=exKcal(ex)||0; }
+  }
+  return out;
+}
+function weekDaysContaining(iso){
+  const dow=(new Date(iso+'T12:00:00').getDay()+6)%7;
+  const mon=isoAddDays(iso,-dow);
+  return Array.from({length:7},(_,i)=>isoAddDays(mon,i));
+}
+function hasExercises(iso){ const d=state.days[iso]; return !!(d&&d.exercises&&d.exercises.length); }
+function exStreak(){
+  let cur=0, iso=todayStr();
+  if(!hasExercises(iso)) iso=isoAddDays(iso,-1); // dzisiejszy brak nie łamie passy do końca dnia
+  while(hasExercises(iso)){ cur++; iso=isoAddDays(iso,-1); }
+  const dates=Object.keys(state.days).filter(hasExercises).sort();
+  let best=0,run=0,prev=null;
+  for(const d of dates){
+    run=(prev&&isoAddDays(prev,1)===d)?run+1:1;
+    if(run>best) best=run;
+    prev=d;
+  }
+  return {cur,best:Math.max(best,cur)};
+}
+function findLiveExercise(){
+  for(const iso of [todayStr(),isoAddDays(todayStr(),-1)]){
+    const d=state.days[iso];
+    if(d&&d.exercises){ const ex=d.exercises.find(x=>x.live); if(ex) return {iso,ex}; }
+  }
+  return null;
+}
 function mealTypeForHour(h){
   if(h<10) return 'sniadanie';
   if(h<12) return 'przekaska1';
@@ -703,6 +807,8 @@ function renderProfile(){
   $('#tKcal').value   = state.profile.targets.kcal   ?? '';
   $('#tBialko').value = state.profile.targets.bialko ?? '';
   $('#tWoda').value   = state.profile.targets.woda   ?? '';
+  $('#tExMin').value      = state.profile.targets.exMin      ?? '';
+  $('#tExSessions').value = state.profile.targets.exSessions ?? '';
 
   const tb = $('#profileMetricsTable tbody');
   tb.innerHTML='';
@@ -728,6 +834,8 @@ $('#saveProfileBtn').addEventListener('click',()=>{
     kcal:   parseNum($('#tKcal').value),
     bialko: parseNum($('#tBialko').value),
     woda:   parseNum($('#tWoda').value),
+    exMin:      parseNum($('#tExMin').value),
+    exSessions: parseNum($('#tExSessions').value),
   };
   $$('#profileMetricsTable input').forEach(inp=>{
     const k=inp.dataset.pm, f=inp.dataset.fld;
@@ -839,14 +947,27 @@ function renderDay(){
   // ćwiczenia
   const exTb=$('#exTable tbody'); exTb.innerHTML='';
   for(const ex of day.exercises){
+    const k=exKcal(ex);
     exTb.insertAdjacentHTML('beforeend',`
       <tr data-exid="${ex.id}">
-        <td><input type="date" value="${ex.date||currentDay}" data-exfld="date" style="width:150px"></td>
-        <td><input type="time" value="${ex.time||''}" data-exfld="time" style="width:104px"></td>
-        <td><input type="text" value="${esc(ex.desc||'')}" placeholder="np. spacer 40 min, siłownia..." data-exfld="desc"></td>
+        <td><input type="date" value="${ex.date||currentDay}" data-exfld="date" style="width:140px"></td>
+        <td><input type="time" value="${ex.time||''}" data-exfld="time" style="width:96px"></td>
+        <td><input type="time" value="${ex.timeEnd||''}" data-exfld="timeEnd" style="width:96px"></td>
+        <td class="num"><input type="number" min="0" step="1" value="${ex.durMin??''}" data-exfld="durMin" style="width:72px;text-align:right"></td>
+        <td><input type="text" list="exCatList" value="${esc(ex.cat||'')}" placeholder="wybierz lub wpisz..." data-exfld="cat" style="min-width:150px"></td>
+        <td><select data-exfld="intens" style="width:60px">${['','1','2','3','4','5'].map(v=>`<option value="${v}" ${String(ex.intens??'')===v?'selected':''}>${v||'–'}</option>`).join('')}</select></td>
+        <td><input type="text" value="${esc(ex.desc||'')}" placeholder="opis..." data-exfld="desc" style="min-width:140px"></td>
+        <td class="num"><span class="exkcal">${k!=null?'~'+fmt(k,0):''}</span>${ex.live?' <span class="pill" style="background:#fdecea;color:var(--bad)">● trwa</span>':''}</td>
         <td><button class="btn danger small" data-exdel="${ex.id}">✕</button></td>
       </tr>`);
   }
+
+  // passa treningowa + przycisk start/stop
+  const stq=exStreak();
+  const pill=$('#exStreakPill');
+  if(stq.cur>0){ pill.style.display=''; pill.textContent=`🔥 passa: ${stq.cur} ${stq.cur===1?'dzień':'dni'} z ruchem (rekord: ${stq.best})`; }
+  else pill.style.display='none';
+  renderStartStop();
 
   $('#dayNotes').value=day.notes||'';
   renderSummary();
@@ -912,7 +1033,7 @@ function refreshMealTotals(){
 
 $('#addExBtn').addEventListener('click',()=>{
   const day=getDay(currentDay);
-  day.exercises.push({id:uid(),date:currentDay,time:nowTime(),desc:''});
+  day.exercises.push({id:uid(),date:currentDay,time:nowTime(),timeEnd:'',durMin:null,cat:'',intens:'',desc:''});
   save(); renderDay();
 });
 $('#exTable').addEventListener('click',e=>{
@@ -925,9 +1046,52 @@ $('#exTable').addEventListener('input',e=>{
   const tr=e.target.closest('tr[data-exid]'); if(!tr) return;
   const day=getDay(currentDay);
   const ex=day.exercises.find(x=>x.id===tr.dataset.exid); if(!ex) return;
-  ex[e.target.dataset.exfld]=e.target.value;
-  save();
+  const f=e.target.dataset.exfld;
+  ex[f]=e.target.value;
+  if(f==='durMin') ex.durMin=parseNum(e.target.value);
+  if(f==='time'||f==='timeEnd'){
+    const s=timeToHours(ex.time), en=timeToHours(ex.timeEnd);
+    if(s!=null&&en!=null){
+      let d=en-s; if(d<0) d+=24;
+      ex.durMin=Math.round(d*60);
+      const di=tr.querySelector('[data-exfld="durMin"]');
+      if(di) di.value=ex.durMin;
+    }
+  }
+  const k=exKcal(ex);
+  const span=tr.querySelector('.exkcal');
+  if(span) span.textContent=k!=null?'~'+fmt(k,0):'';
+  save(); renderSummary();
 });
+/* ▶/⏹ start–stop treningu */
+$('#startStopBtn').addEventListener('click',()=>{
+  const live=findLiveExercise();
+  if(live){
+    live.ex.live=false;
+    live.ex.timeEnd=nowTime();
+    live.ex.durMin=exDurMin({time:live.ex.time,timeEnd:live.ex.timeEnd});
+    save(); renderDay();
+    toast(`⏹ Trening zakończony — ${fmt(live.ex.durMin,0)} min 💪`);
+  } else {
+    const iso=todayStr();
+    getDay(iso).exercises.push({id:uid(),date:iso,time:nowTime(),timeEnd:'',durMin:null,cat:'',intens:'',desc:'',live:true});
+    save();
+    currentDay=iso;
+    renderDay();
+    toast('▶ Trening rozpoczęty — powodzenia! 💪');
+  }
+});
+function renderStartStop(){
+  const b=$('#startStopBtn');
+  const live=findLiveExercise();
+  if(live){
+    b.textContent=`⏹ Zakończ trening (start ${live.ex.time||'?'})`;
+    b.classList.remove('orange'); b.classList.add('primary');
+  } else {
+    b.textContent='▶ Rozpocznij trening teraz';
+    b.classList.remove('primary'); b.classList.add('orange');
+  }
+}
 $('#dayNotes').addEventListener('input',e=>{ getDay(currentDay).notes=e.target.value; save(); });
 
 /* ---------- szybka woda (FAB) ---------- */
@@ -960,6 +1124,9 @@ function renderSummary(){
   $('#kKcalT').textContent  = tg.kcal  ? 'cel: '+fmt(tg.kcal,0)  : 'brak celu';
   $('#kBialkoT').textContent= tg.bialko? 'cel: '+fmt(tg.bialko,0): 'brak celu';
   $('#kWodaT').textContent  = tg.woda  ? 'cel: '+fmt(tg.woda,1)  : 'brak celu';
+  const exs=dayExStats(currentDay);
+  $('#kSpal').textContent = exs.kcal ? '~'+fmt(exs.kcal,0) : '0';
+  $('#kBilans').textContent = fmt(t.kcal-exs.kcal,0);
 
   const defs=[
     {lab:'Kalorie', v:t.kcal,  g:tg.kcal,  u:'kcal', dec:0},
@@ -981,12 +1148,27 @@ function renderSummary(){
   $('#waterDots').innerHTML=Array.from({length:cups},(_,i)=>`<div class="wd ${i<full?'full':''}"></div>`).join('')
     + ` <span class="hint" style="margin-left:8px">${fmt(t.woda,2)} / ${fmt(goalL,1)} l</span>`;
 
+  // cel tygodniowy ruchu (pon.–niedz. zawierający wyświetlany dzień)
+  const wk=weekDaysContaining(currentDay);
+  let wMin=0,wCnt=0;
+  wk.forEach(iso=>{ const s=dayExStats(iso); wMin+=s.min; wCnt+=s.count; });
+  let wab='';
+  if(tg.exMin){
+    const pctW=Math.round(wMin/tg.exMin*100);
+    wab=`<div class="pb">
+      <div class="lab"><span><b>🏋️ Ruch w tym tygodniu</b> — ${fmt(wMin,0)} / ${fmt(tg.exMin,0)} min${tg.exSessions?` · treningi: ${wCnt}/${fmt(tg.exSessions,0)}`:''}</span><span>${pctW}%</span></div>
+      <div class="track"><div class="fill ${pctW<50?'warn':''}" style="width:${Math.min(pctW,100)}%"></div></div>
+    </div>`;
+  }
+  $('#weekActivityBox').innerHTML=wab;
+
   const day=state.days[currentDay];
   const issues=[];
   if(tg.bialko && t.bialko<tg.bialko*0.9) issues.push(`Białko — brakuje ${fmt(tg.bialko-t.bialko,0)} g`);
   if(tg.woda   && t.woda  <tg.woda*0.9)   issues.push(`Woda — brakuje ${fmt(tg.woda-t.woda,2)} l`);
   if(tg.kcal   && t.kcal  >tg.kcal*1.1)   issues.push(`Kalorie — przekroczono o ${fmt(t.kcal-tg.kcal,0)} kcal`);
-  if(!day || !day.exercises.length)        issues.push('Ćwiczenia — brak zapisanej aktywności');
+  if(!day || !day.exercises.length)        issues.push('Ćwiczenia — brak zapisanej aktywności dziś');
+  if(tg.exMin && wMin<tg.exMin)            issues.push(`Ruch — do celu tygodnia (${fmt(tg.exMin,0)} min) brakuje ${fmt(tg.exMin-wMin,0)} min`);
   const box=$('#improveBox');
   if(issues.length){
     box.className='improve';
@@ -1032,7 +1214,16 @@ $('#printBtn').addEventListener('click',()=>{
     rows+=`<tr><td colspan="5" class="sec">${M.label}${M.hours?` (optymalnie ${M.hours})`:''}</td></tr>`;
     rows+=es.map(e=>`<tr><td>${e.time||''}</td><td>${esc(e.desc||'')}</td><td style="text-align:right">${fmt(parseNum(e.bialko))}</td><td style="text-align:right">${fmt(parseNum(e.woda),2)}</td><td style="text-align:right">${fmt(parseNum(e.kcal),0)}</td></tr>`).join('');
   }
-  const exRows=day.exercises.map(e=>`<tr><td>${fmtDatePL(e.date)}</td><td>${e.time||''}</td><td>${esc(e.desc||'')}</td></tr>`).join('');
+  const exs=dayExStats(currentDay);
+  const exRows=day.exercises.map(e=>{
+    const m=exDurMin(e), k=exKcal(e);
+    return `<tr><td>${fmtDatePL(e.date)}</td><td>${e.time||''}</td><td>${e.timeEnd||''}</td><td style="text-align:right">${m?fmt(m,0):''}</td><td>${esc(e.cat||'')}</td><td style="text-align:center">${e.intens||''}</td><td>${esc(e.desc||'')}</td><td style="text-align:right">${k?'~'+fmt(k,0):''}</td></tr>`;
+  }).join('');
+  const exTableHtml=exRows?`<table>
+    <thead><tr><th colspan="8">Ćwiczenia</th></tr><tr><th>Data</th><th>Start</th><th>Koniec</th><th>Czas (min)</th><th>Kategoria</th><th>Int.</th><th>Opis</th><th>~kcal</th></tr></thead>
+    <tbody>${exRows}
+      <tr class="tot"><td colspan="3">Razem:</td><td style="text-align:right">${fmt(exs.min,0)}</td><td colspan="3"></td><td style="text-align:right">~${fmt(exs.kcal,0)}</td></tr>
+    </tbody></table>`:'';
   const issues=$('#improveBox').innerText.replace(/\n/g,'<br>');
 
   // kubki wody
@@ -1075,8 +1266,9 @@ $('#printBtn').addEventListener('click',()=>{
     ${printBarRow('Białko',t.bialko,tg.bialko,'g',1)}
     ${printBarRow('Woda',t.woda,tg.woda,'l',2)}
     <div class="pbarrow"><div class="pbarlab">Woda — wizualnie (1 kubek = 0,25 l)</div>${cupsHtml}</div>
+    ${exs.kcal?`<div class="foot"><b>🔥 Spalone (ćwiczenia, szacunkowo):</b> ~${fmt(exs.kcal,0)} kcal &nbsp;·&nbsp; <b>Bilans dnia (zjedzone − spalone):</b> ${fmt(t.kcal-exs.kcal,0)} kcal</div>`:''}
     ${weightHtml}
-    ${exRows?`<table><thead><tr><th colspan="3">Ćwiczenia</th></tr><tr><th>Data</th><th>Godzina</th><th>Opis</th></tr></thead><tbody>${exRows}</tbody></table>`:''}
+    ${exTableHtml}
     ${day.notes?`<div class="foot"><b>Sugestie trenera / Notatki:</b><br>${esc(day.notes).replace(/\n/g,'<br>')}</div>`:''}
     <div class="foot">${issues}</div>
   `);
@@ -1314,7 +1506,8 @@ function buildWeekReport(offset){
     const t=dayTotals(iso);
     const d=state.days[iso];
     const logged=!!(d&&d.meals&&d.meals.length);
-    return {iso,t,logged,ex:d&&d.exercises?d.exercises.length:0,score:logged?dayScore(t,tg):null};
+    const es=dayExStats(iso);
+    return {iso,t,logged,ex:es.count,exMin:es.min,exKcal:es.kcal,score:logged?dayScore(t,tg):null};
   });
   const logged=rows.filter(r=>r.logged);
   const avg=k=>logged.length?logged.reduce((a,r)=>a+r.t[k],0)/logged.length:null;
@@ -1325,18 +1518,30 @@ function buildWeekReport(offset){
   const wB=lastWeightOnOrBefore(days[6]);
   const wDelta=(wA&&wB&&wB.date>wA.date)?wB.v-wA.v:null;
   const exTotal=rows.reduce((a,r)=>a+r.ex,0);
-  return {days,rows,logged:logged.length,avgKcal:avg('kcal'),avgB:avg('bialko'),avgW:avg('woda'),best,worst,wDelta,wA,wB,exTotal,tg};
+  const exMinTotal=rows.reduce((a,r)=>a+r.exMin,0);
+  const exKcalTotal=rows.reduce((a,r)=>a+r.exKcal,0);
+  // dominująca kategoria (wg minut)
+  const byCat={};
+  for(const iso of days){
+    const d=state.days[iso];
+    if(!d||!d.exercises) continue;
+    for(const ex of d.exercises){ const m=exDurMin(ex); if(m) byCat[ex.cat||'✨ Inne']=(byCat[ex.cat||'✨ Inne']||0)+m; }
+  }
+  const domCat=Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0]||null;
+  // poprzedni tydzień (minuty) do porównania
+  const prevMin=weekDaysArr(offset-1).reduce((a,iso)=>a+dayExStats(iso).min,0);
+  return {days,rows,logged:logged.length,avgKcal:avg('kcal'),avgB:avg('bialko'),avgW:avg('woda'),best,worst,wDelta,wA,wB,exTotal,exMinTotal,exKcalTotal,domCat,prevMin,tg};
 }
 function weekRowsTable(R,forPrint){
   const dayCell=r=>`${weekdayPL(r.iso).slice(0,3)}. ${fmtDatePL(r.iso).slice(0,5)}`;
   return `<table>
-    <thead><tr><th>Dzień</th><th class="num">Kalorie</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Ćwiczenia</th><th class="num">Wynik dnia</th></tr></thead>
+    <thead><tr><th>Dzień</th><th class="num">Kalorie</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Ruch</th><th class="num">Wynik dnia</th></tr></thead>
     <tbody>${R.rows.map(r=>`<tr>
       <td>${dayCell(r)}</td>
       <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.logged?fmt(r.t.kcal,0):'—'}</td>
       <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.logged?fmt(r.t.bialko):'—'}</td>
       <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.logged?fmt(r.t.woda,2):'—'}</td>
-      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.ex||''}</td>
+      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.exMin?fmt(r.exMin,0)+' min':(r.ex?r.ex+'×':'')}</td>
       <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.score!=null?r.score+'%':''}</td>
     </tr>`).join('')}</tbody>
   </table>`;
@@ -1352,9 +1557,18 @@ function renderWeekReport(){
     ${kpi(R.avgKcal!=null?fmt(R.avgKcal,0):'—','śr. kcal / dzień',tg.kcal?'cel: '+fmt(tg.kcal,0):'')}
     ${kpi(R.avgB!=null?fmt(R.avgB):'—','śr. białko (g)',tg.bialko?'cel: '+fmt(tg.bialko,0):'')}
     ${kpi(R.avgW!=null?fmt(R.avgW,2):'—','śr. woda (l)',tg.woda?'cel: '+fmt(tg.woda,1):'')}
-    ${kpi(String(R.exTotal),'treningi','w tym tygodniu')}
+    ${kpi(String(R.exTotal),'treningi',tg.exSessions?'cel: '+fmt(tg.exSessions,0):'')}
+    ${kpi(R.exMinTotal?fmt(R.exMinTotal,0):'0','minuty ruchu',tg.exMin?'cel: '+fmt(tg.exMin,0)+' min':'')}
+    ${kpi(R.exKcalTotal?'~'+fmt(R.exKcalTotal,0):'0','kcal spalone','szacunkowo')}
     ${kpi(R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—','zmiana wagi',R.wDelta!=null?fmtDatePL(R.wA.date)+' → '+fmtDatePL(R.wB.date):'brak 2 pomiarów')}
   </div>`;
+  const exBits=[];
+  if(R.domCat) exBits.push(`🏃 Najwięcej ruchu: <b>${esc(R.domCat[0])}</b> (${fmt(R.domCat[1],0)} min)`);
+  if(R.exMinTotal||R.prevMin){
+    const dMin=R.exMinTotal-R.prevMin;
+    exBits.push(`${dMin>=0?'+':''}${fmt(dMin,0)} min vs poprzedni tydzień ${dMin>=0?'📈':'📉'}`);
+  }
+  if(exBits.length) html+=`<p class="hint">${exBits.join(' · ')}</p>`;
   if(R.best) html+=`<p class="hint">🏆 Najlepszy dzień: <b>${weekdayPL(R.best.iso)} ${fmtDatePL(R.best.iso)}</b> (${R.best.score}%)`
     +(R.worst&&R.worst.iso!==R.best.iso?` · 😬 Najsłabszy: <b>${weekdayPL(R.worst.iso)} ${fmtDatePL(R.worst.iso)}</b> (${R.worst.score}%)`:'')+'</p>';
   html+='<div class="tscroll">'+weekRowsTable(R,false)+'</div>';
@@ -1370,6 +1584,8 @@ $('#printWeekBtn').addEventListener('click',()=>{
     <div class="phead">
       <span>Dni z wpisami: <b>${R.logged}/7</b></span>
       <span>Treningi: <b>${R.exTotal}</b></span>
+      <span>Czas ruchu: <b>${fmt(R.exMinTotal,0)} min</b></span>
+      <span>Spalone: <b>~${fmt(R.exKcalTotal,0)} kcal</b></span>
       <span>Zmiana wagi: <b>${R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—'}</b></span>
     </div>
     ${weekRowsTable(R,true)}
@@ -1387,7 +1603,62 @@ $('#printWeekBtn').addEventListener('click',()=>{
 });
 
 /* ================= STATYSTYKI ================= */
-let metricChart=null, intakeChart=null, mealTimesChart=null, corrChart=null;
+let metricChart=null, intakeChart=null, mealTimesChart=null, corrChart=null, exWeekChart=null, exCatChart=null;
+
+/* ---------- statystyki aktywności ---------- */
+function renderExerciseStats(){
+  const tg=state.profile.targets||{};
+  const {cur,best}=exStreak();
+  const wk=weekDaysContaining(todayStr());
+  let wMin=0; wk.forEach(iso=>wMin+=dayExStats(iso).min);
+  // 8 ostatnich tygodni
+  const labels=[],mins=[];
+  for(let i=7;i>=0;i--){
+    const days=weekDaysArr(-i);
+    labels.push(fmtDatePL(days[0]).slice(0,5));
+    mins.push(days.reduce((a,iso)=>a+dayExStats(iso).min,0));
+  }
+  const totalSessions=Object.keys(state.days).reduce((a,iso)=>a+((state.days[iso].exercises||[]).length),0);
+  const kpi=(v,l,s)=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div><div class="s">${s||''}</div></div>`;
+  $('#exStatsKpis').innerHTML=
+    kpi(cur?'🔥 '+cur:'0','passa (dni z ruchem)','rekord: '+best)+
+    kpi(fmt(wMin,0),'min w tym tygodniu',tg.exMin?'cel: '+fmt(tg.exMin,0)+' min':'')+
+    kpi(fmt(mins.reduce((a,b)=>a+b,0)/8,0),'śr. min / tydzień','ostatnie 8 tygodni')+
+    kpi(String(totalSessions),'treningów łącznie','od początku');
+  // kategorie — ostatnie 30 dni
+  const byCat={};
+  for(let i=0;i<30;i++){
+    const iso=isoAddDays(todayStr(),-i);
+    const d=state.days[iso];
+    if(!d||!d.exercises) continue;
+    for(const ex of d.exercises){
+      const m=exDurMin(ex);
+      if(m) byCat[ex.cat||'✨ Inne']=(byCat[ex.cat||'✨ Inne']||0)+m;
+    }
+  }
+  if(typeof Chart==='undefined') return;
+  if(exWeekChart) exWeekChart.destroy();
+  exWeekChart=new Chart($('#exWeekChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Minuty ruchu',data:mins,backgroundColor:'rgba(15,157,118,.7)',borderRadius:6},
+      ...(tg.exMin?[{type:'line',label:'Cel tygodniowy',data:mins.map(()=>tg.exMin),borderColor:'#f39c12',borderDash:[7,5],pointRadius:0}]:[])
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
+  });
+  if(exCatChart) exCatChart.destroy();
+  const catEntries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  exCatChart=new Chart($('#exCatChart'),{
+    type:'doughnut',
+    data:{
+      labels:catEntries.length?catEntries.map(e=>e[0]):['brak danych'],
+      datasets:[{data:catEntries.length?catEntries.map(e=>e[1]):[1],
+        backgroundColor:['#0f9d76','#2f6fb0','#f39c12','#8e44ad','#c0392b','#d35400','#16a085','#7f8c8d','#f1c40f']}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},
+      tooltip:{callbacks:{label:c=>catEntries.length?` ${c.label}: ${fmt(c.parsed,0)} min`:' brak treningów w ostatnich 30 dniach'}}}}
+  });
+}
 
 function initStatSelectors(){
   $('#chartMetricSel').innerHTML=METRICS.map(m=>`<option value="${m.key}">${m.label}${m.unit?' ('+m.unit+')':''}</option>`).join('');
@@ -1399,6 +1670,7 @@ function renderStats(){
   renderWeekReport();
   renderStatsTable();
   renderCorrelations();
+  renderExerciseStats();
   if(typeof Chart==='undefined'){
     $('#metricChart').closest('.chartbox').innerHTML='<p class="hint">Wykresy wymagają połączenia z internetem (biblioteka Chart.js).</p>';
     return;
@@ -1484,6 +1756,17 @@ function renderMealTimesChart(){
     });
     datasets.push({label:M.label,type:'scatter',data,backgroundColor:MEAL_COLORS[M.key],pointRadius:5});
   }
+  // treningi (godzina startu)
+  const trainData=[];
+  daysIso.forEach((iso,ix)=>{
+    const d=state.days[iso];
+    if(!d||!d.exercises) return;
+    for(const ex of d.exercises){
+      const h=timeToHours(ex.time);
+      if(h!=null) trainData.push({x:ix,y:h});
+    }
+  });
+  datasets.push({label:'🏋️ Trening',type:'scatter',data:trainData,backgroundColor:'#1e2a35',pointStyle:'rectRot',pointRadius:7});
   daysIso.forEach(iso=>{
     const d=state.days[iso];
     if(!d||!d.meals.length) return;
@@ -1521,15 +1804,18 @@ function renderMealTimesChart(){
 
 /* ---------- korelacje ---------- */
 function avgIntakeBetween(fromIso,toIso){
-  // średnie dzienne spożycie w oknie (fromIso, toIso] — tylko dni z wpisami
-  let n=0,k=0,b=0,w=0;
+  // średnie dzienne spożycie w oknie (fromIso, toIso] — spożycie z dni z wpisami, ruch z dni kalendarzowych
+  let n=0,k=0,b=0,w=0,exM=0,cal=0;
   let iso=isoAddDays(fromIso,1);
   while(iso<=toIso){
     const d=state.days[iso];
     if(d&&d.meals&&d.meals.length){ const t=dayTotals(iso); n++; k+=t.kcal; b+=t.bialko; w+=t.woda; }
+    exM+=dayExStats(iso).min;
+    cal++;
     iso=isoAddDays(iso,1);
   }
-  return n?{n,kcal:k/n,bialko:b/n,woda:w/n}:null;
+  if(!n&&!exM) return null;
+  return {n,kcal:n?k/n:null,bialko:n?b/n:null,woda:n?w/n:null,exPerDay:cal?exM/cal:0};
 }
 function renderCorrelations(){
   const wrap=$('#corrWrap');
@@ -1549,22 +1835,23 @@ function renderCorrelations(){
     const a=pts[i-1], b=pts[i];
     const days=Math.round((new Date(b.date+'T12:00:00')-new Date(a.date+'T12:00:00'))/86400000);
     const avg=avgIntakeBetween(a.date,b.date);
-    chartK.push(avg?Math.round(avg.kcal):null);
+    chartK.push(avg&&avg.kcal!=null?Math.round(avg.kcal):null);
     const dW=b.v-a.v;
     rows+=`<tr>
       <td>${fmtDatePL(a.date)} → ${fmtDatePL(b.date)}</td>
       <td class="num">${days}</td>
       <td class="num">${diffBadge(b.v,a.v,'down')||fmt(dW)}</td>
-      <td class="num">${avg?fmt(avg.kcal,0):'—'}</td>
-      <td class="num">${avg?fmt(avg.bialko):'—'}</td>
-      <td class="num">${avg?fmt(avg.woda,2):'—'}</td>
+      <td class="num">${avg&&avg.kcal!=null?fmt(avg.kcal,0):'—'}</td>
+      <td class="num">${avg&&avg.bialko!=null?fmt(avg.bialko):'—'}</td>
+      <td class="num">${avg&&avg.woda!=null?fmt(avg.woda,2):'—'}</td>
+      <td class="num">${avg?fmt(avg.exPerDay,0):'—'}</td>
       <td class="num">${avg?avg.n:'0'}</td>
     </tr>`;
   }
   wrap.innerHTML=`<div class="tscroll"><table>
-    <thead><tr><th>Okres między pomiarami</th><th class="num">Dni</th><th class="num">Zmiana wagi (kg)</th><th class="num">śr. kcal/d</th><th class="num">śr. białko/d</th><th class="num">śr. woda/d</th><th class="num">dni z wpisami</th></tr></thead>
+    <thead><tr><th>Okres między pomiarami</th><th class="num">Dni</th><th class="num">Zmiana wagi (kg)</th><th class="num">śr. kcal/d</th><th class="num">śr. białko/d</th><th class="num">śr. woda/d</th><th class="num">śr. min ruchu/d</th><th class="num">dni z wpisami</th></tr></thead>
     <tbody>${rows}</tbody></table></div>
-    <p class="hint">Porównuj wiersze: okresy z niższym średnim spożyciem kalorii powinny pokazywać większe spadki wagi. Jeśli tak nie jest — sprawdź kompletność wpisów w dzienniku.</p>`;
+    <p class="hint">Porównuj wiersze: okresy z niższym średnim spożyciem kalorii i większą ilością ruchu powinny pokazywać większe spadki wagi. Jeśli tak nie jest — sprawdź kompletność wpisów w dzienniku.</p>`;
 
   if(typeof Chart==='undefined') return;
   if(corrChart) corrChart.destroy();
