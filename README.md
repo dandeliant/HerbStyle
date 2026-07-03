@@ -16,6 +16,7 @@ Dane zapisują się automatycznie w pamięci przeglądarki (localStorage).
 - **🎯 Droga do celu** — pasek postępu wagi z prognozą daty osiągnięcia celu na podstawie dotychczasowego tempa.
 - **🍎 Baza produktów** — zapisane produkty/posiłki dodawane do dziennika jednym kliknięciem (⭐ zapisuje wpis z dziennika do bazy).
 - **💧 Szybka woda** — pływający przycisk dodający wypitą wodę (100–1000 ml) z automatycznym przypisaniem do posiłku wg godziny.
+- **🏋️ Ćwiczenia** — start/koniec z automatycznym liczeniem czasu (także przez północ), przycisk ▶/⏹ „trening na żywo”, kategorie aktywności, intensywność 1–5, szacunek spalonych kalorii (MET × intensywność × waga × czas), bilans dnia (zjedzone − spalone), cel tygodniowy (minuty i treningi), passa dni z ruchem, wykres minut/tydzień i rozkładu kategorii, ruch w korelacjach i raporcie tygodniowym.
 - **💾 Kopia zapasowa** — eksport i import wszystkich danych (łącznie ze zdjęciami) do pliku JSON.
 - **📱 PWA** — aplikację można zainstalować na telefonie (Dodaj do ekranu głównego); działa offline.
 
