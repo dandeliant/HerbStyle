@@ -1,7 +1,7 @@
 /* HerbStyle service worker — strategia network-first z zapasem offline.
    Świeża wersja jest zawsze pobierana z sieci (aktualizacje działają od razu),
    a ostatnia znana kopia jest serwowana, gdy nie ma internetu. */
-const CACHE = 'herbstyle-v1';
+const CACHE = 'herbstyle-v2';
 
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -16,7 +16,8 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith((async () => {
     try {
-      const fresh = await fetch(e.request);
+      // 'no-cache' = zawsze rewaliduj z serwerem (pomija przeterminowany cache HTTP przeglądarki)
+      const fresh = await fetch(e.request, { cache: 'no-cache' });
       if (fresh && fresh.ok) {
         const cache = await caches.open(CACHE);
         cache.put(e.request, fresh.clone());
