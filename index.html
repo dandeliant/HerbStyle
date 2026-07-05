@@ -167,6 +167,11 @@
   .fabpop button:hover{background:var(--blue);color:#fff}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--ink);color:#fff;padding:10px 20px;border-radius:24px;opacity:0;pointer-events:none;transition:.3s;z-index:60;font-size:.92rem}
   .toast.show{opacity:1}
+  .fabpop .fplist{max-height:210px;overflow-y:auto;margin-bottom:8px}
+  .fabpop .fplist button{display:block;width:100%;text-align:left;margin-bottom:4px;background:#fff;border:1px solid var(--line);color:var(--ink);font-weight:600;border-radius:8px;padding:7px 10px;cursor:pointer}
+  .fabpop .fplist button:hover{border-color:var(--accent);background:#fdf6ea}
+  .fabpop .fplist .sub{font-size:.74rem;color:var(--muted);font-weight:400}
+  .fabpop .fpform input{margin-bottom:6px;padding:7px 9px;font-size:.88rem}
 
   /* ---------- print ---------- */
   #printArea{display:none}
@@ -239,6 +244,7 @@
         <div><label class="f">Woda (l)</label><input type="number" step="0.1" id="tWoda" placeholder="np. 3"></div>
         <div><label class="f">Ruch — minuty / tydzień</label><input type="number" id="tExMin" placeholder="np. 150 (zalecenie WHO)"></div>
         <div><label class="f">Ruch — treningi / tydzień</label><input type="number" id="tExSessions" placeholder="np. 3"></div>
+        <div><label class="f">Sen — godziny / noc</label><input type="number" step="0.5" id="tSleepH" placeholder="np. 7"></div>
       </div>
       <p class="hint">Te wartości pojawią się w podsumowaniu każdego dnia jako punkt odniesienia. Cel ruchu jest liczony w skali tygodnia (pon.–niedz.).</p>
     </div>
@@ -318,6 +324,21 @@
     </div>
 
     <div class="card">
+      <div class="flexrow" style="margin-bottom:10px">
+        <h2 style="margin:0">😴 Sen</h2>
+        <span class="pill" id="sleepPill" style="display:none"></span>
+      </div>
+      <div class="tscroll"><table id="sleepTable">
+        <thead><tr><th>Zasnięcie — data</th><th>godz.</th><th>Pobudka — data</th><th>godz.</th><th class="num">Czas snu</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="addrow" style="padding-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn ghost small" id="addSleepBtn">＋ Dodaj sen</button>
+        <span class="hint">Czas snu liczy się automatycznie (także przez północ). Sen jest przypisany do dnia pobudki.</span>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>📝 Sugestie trenera / Notatki</h2>
       <textarea id="dayNotes" placeholder="Notatki do tego dnia, uwagi trenera, samopoczucie..."></textarea>
     </div>
@@ -331,6 +352,7 @@
         <div class="kpi"><div class="v" id="kPosilki">0</div><div class="l">posiłki</div><div class="s">zapisane dziś</div></div>
         <div class="kpi"><div class="v" id="kSpal">0</div><div class="l">🔥 spalone (kcal)</div><div class="s">ćwiczenia, szacunkowo</div></div>
         <div class="kpi"><div class="v" id="kBilans">0</div><div class="l">bilans dnia</div><div class="s">zjedzone − spalone</div></div>
+        <div class="kpi"><div class="v" id="kSen">—</div><div class="l">😴 sen (ost. noc)</div><div class="s" id="kSenT"></div></div>
       </div>
       <div id="bars"></div>
       <div style="margin:12px 0">
@@ -406,6 +428,12 @@
     </div>
 
     <div class="card">
+      <h2>😴 Sen — ostatnie 14 dni</h2>
+      <div class="kpis" id="sleepStatsKpis"></div>
+      <div class="chartbox" style="min-height:240px"><canvas id="sleepChart"></canvas></div>
+    </div>
+
+    <div class="card">
       <h2>⏰ Pory posiłków i treningów — ostatnie 14 dni</h2>
       <p class="hint" id="lastMealAvg"></p>
       <div class="chartbox"><canvas id="mealTimesChart"></canvas></div>
@@ -454,6 +482,23 @@
     </div>
   </div>
   <div class="fab" id="waterFab" title="Szybkie dodanie wody">💧</div>
+
+  <!-- FAB: szybkie jedzenie -->
+  <div class="fabpop" id="foodPop" style="bottom:152px;width:300px">
+    <div class="fptitle">🍽️ Szybkie dodanie jedzenia</div>
+    <div class="fplist" id="foodPopList"></div>
+    <div class="fpform" style="border-top:1px solid var(--line);padding-top:8px">
+      <input type="text" id="fpName" placeholder="nowy produkt / posiłek...">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <input type="number" id="fpB" placeholder="białko g" step="0.1">
+        <input type="number" id="fpW" placeholder="woda l" step="0.05">
+        <input type="number" id="fpK" placeholder="kcal" step="1">
+      </div>
+      <label style="font-size:.8rem;display:flex;gap:6px;align-items:center;margin:2px 0 8px;color:var(--muted)"><input type="checkbox" id="fpSave" checked style="width:auto"> zapisz też w bazie produktów</label>
+      <button class="btn primary small" id="fpAddBtn" style="width:100%">＋ Dodaj do dziennika</button>
+    </div>
+  </div>
+  <div class="fab" id="foodFab" title="Szybkie dodanie jedzenia" style="bottom:86px;background:var(--accent);box-shadow:0 6px 16px rgba(243,156,18,.45)">🍽️</div>
   <div class="toast" id="toast"></div>
 </div>
 
@@ -568,6 +613,8 @@ function load(){
   if(!st.products) st.products=[{id:'seed1',name:'Szejk Herbalife',bialko:18,woda:0.25,kcal:220}];
   if(st.profile.targets.exMin===undefined) st.profile.targets.exMin=150;
   if(st.profile.targets.exSessions===undefined) st.profile.targets.exSessions=3;
+  if(!st.sleep) st.sleep=[];
+  if(st.profile.targets.sleepH===undefined) st.profile.targets.sleepH=7;
   return st;
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -702,6 +749,22 @@ function exStreak(){
   }
   return {cur,best:Math.max(best,cur)};
 }
+/* ---------- sen ---------- */
+function sleepDurMin(s){
+  if(!s.startDate||!s.start||!s.endDate||!s.end) return null;
+  const a=new Date(s.startDate+'T'+s.start), b=new Date(s.endDate+'T'+s.end);
+  if(isNaN(a)||isNaN(b)) return null;
+  const d=Math.round((b-a)/60000);
+  return (d>0 && d<48*60)?d:null;
+}
+function daySleepMin(iso){
+  return (state.sleep||[]).filter(s=>s.endDate===iso).reduce((a,s)=>a+(sleepDurMin(s)||0),0);
+}
+function fmtDur(min){
+  if(!min) return '—';
+  const h=Math.floor(min/60), m=Math.round(min%60);
+  return h+' h '+String(m).padStart(2,'0')+' min';
+}
 function findLiveExercise(){
   for(const iso of [todayStr(),isoAddDays(todayStr(),-1)]){
     const d=state.days[iso];
@@ -809,6 +872,7 @@ function renderProfile(){
   $('#tWoda').value   = state.profile.targets.woda   ?? '';
   $('#tExMin').value      = state.profile.targets.exMin      ?? '';
   $('#tExSessions').value = state.profile.targets.exSessions ?? '';
+  $('#tSleepH').value     = state.profile.targets.sleepH     ?? '';
 
   const tb = $('#profileMetricsTable tbody');
   tb.innerHTML='';
@@ -836,6 +900,7 @@ $('#saveProfileBtn').addEventListener('click',()=>{
     woda:   parseNum($('#tWoda').value),
     exMin:      parseNum($('#tExMin').value),
     exSessions: parseNum($('#tExSessions').value),
+    sleepH:     parseNum($('#tSleepH').value),
   };
   $$('#profileMetricsTable input').forEach(inp=>{
     const k=inp.dataset.pm, f=inp.dataset.fld;
@@ -884,6 +949,7 @@ $('#importFile').addEventListener('change',async e=>{
   if(!state.products) state.products=[];
   if(!state.measurements) state.measurements=[];
   if(!state.days) state.days={};
+  if(!state.sleep) state.sleep=[];
   save();
   await clearPhotos();
   for(const [id,dataUrl] of Object.entries(photos)){ try{ await putPhoto(id,dataUrl); }catch(err){} }
@@ -961,6 +1027,27 @@ function renderDay(){
         <td><button class="btn danger small" data-exdel="${ex.id}">✕</button></td>
       </tr>`);
   }
+
+  // sen (przypisany do dnia pobudki)
+  const slTb=$('#sleepTable tbody'); slTb.innerHTML='';
+  for(const s of (state.sleep||[]).filter(x=>x.endDate===currentDay)){
+    slTb.insertAdjacentHTML('beforeend',`
+      <tr data-slid="${s.id}">
+        <td><input type="date" value="${s.startDate||''}" data-slfld="startDate" style="width:140px"></td>
+        <td><input type="time" value="${s.start||''}" data-slfld="start" style="width:96px"></td>
+        <td><input type="date" value="${s.endDate||''}" data-slfld="endDate" style="width:140px"></td>
+        <td><input type="time" value="${s.end||''}" data-slfld="end" style="width:96px"></td>
+        <td class="num"><span class="sldur">${fmtDur(sleepDurMin(s))}</span></td>
+        <td><button class="btn danger small" data-sldel="${s.id}">✕</button></td>
+      </tr>`);
+  }
+  const slM=daySleepMin(currentDay);
+  const sp=$('#sleepPill');
+  if(slM){
+    const tgS=state.profile.targets.sleepH;
+    sp.style.display='';
+    sp.textContent=`${fmtDur(slM)}${tgS?' / cel '+fmt(tgS,1)+' h':''}${tgS&&slM>=tgS*60?' ✔':''}`;
+  } else sp.style.display='none';
 
   // passa treningowa + przycisk start/stop
   const stq=exStreak();
@@ -1063,6 +1150,34 @@ $('#exTable').addEventListener('input',e=>{
   if(span) span.textContent=k!=null?'~'+fmt(k,0):'';
   save(); renderSummary();
 });
+/* ---------- sen: dodawanie / edycja / usuwanie ---------- */
+$('#addSleepBtn').addEventListener('click',()=>{
+  state.sleep.push({id:uid(),startDate:isoAddDays(currentDay,-1),start:'23:00',endDate:currentDay,end:'07:00'});
+  save(); renderDay();
+});
+$('#sleepTable').addEventListener('click',e=>{
+  const del=e.target.closest('[data-sldel]'); if(!del) return;
+  state.sleep=state.sleep.filter(x=>x.id!==del.dataset.sldel);
+  save(); renderDay();
+});
+$('#sleepTable').addEventListener('input',e=>{
+  const tr=e.target.closest('tr[data-slid]'); if(!tr) return;
+  const s=state.sleep.find(x=>x.id===tr.dataset.slid); if(!s) return;
+  s[e.target.dataset.slfld]=e.target.value;
+  // auto: gdy zaśnięcie wieczorem a pobudka "wcześniej" tego samego dnia — pobudka następnego dnia
+  if(s.startDate&&s.start&&s.end&&s.endDate&&s.endDate<=s.startDate){
+    const st=timeToHours(s.start), en=timeToHours(s.end);
+    if(st!=null&&en!=null&&en<=st){
+      s.endDate=isoAddDays(s.startDate,1);
+      const di=tr.querySelector('[data-slfld="endDate"]');
+      if(di) di.value=s.endDate;
+    }
+  }
+  const span=tr.querySelector('.sldur');
+  if(span) span.textContent=fmtDur(sleepDurMin(s));
+  save(); renderSummary();
+});
+
 /* ▶/⏹ start–stop treningu */
 $('#startStopBtn').addEventListener('click',()=>{
   const live=findLiveExercise();
@@ -1094,9 +1209,48 @@ function renderStartStop(){
 }
 $('#dayNotes').addEventListener('input',e=>{ getDay(currentDay).notes=e.target.value; save(); });
 
-/* ---------- szybka woda (FAB) ---------- */
-$('#waterFab').addEventListener('click',e=>{ e.stopPropagation(); $('#waterPop').classList.toggle('open'); });
-document.addEventListener('click',e=>{ if(!e.target.closest('#waterPop')) $('#waterPop').classList.remove('open'); });
+/* ---------- szybka woda + szybkie jedzenie (FAB) ---------- */
+$('#waterFab').addEventListener('click',e=>{ e.stopPropagation(); $('#foodPop').classList.remove('open'); $('#waterPop').classList.toggle('open'); });
+$('#foodFab').addEventListener('click',e=>{ e.stopPropagation(); $('#waterPop').classList.remove('open'); renderFoodPop(); $('#foodPop').classList.toggle('open'); });
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#waterPop')) $('#waterPop').classList.remove('open');
+  if(!e.target.closest('#foodPop'))  $('#foodPop').classList.remove('open');
+});
+function addQuickMeal(name,b,w,k){
+  const iso=todayStr();
+  const now=new Date();
+  const type=mealTypeForHour(now.getHours()+now.getMinutes()/60);
+  getDay(iso).meals.push({id:uid(),type,time:nowTime(),desc:name,bialko:b,woda:w,kcal:k,createdAt:now.toISOString()});
+  save();
+  if(currentDay===iso) renderDay();
+  toast('🍽️ + '+name);
+}
+function renderFoodPop(){
+  const list=$('#foodPopList');
+  list.innerHTML=state.products.length
+    ? state.products.map(p=>`<button data-fpid="${p.id}">${esc(p.name)}<div class="sub">${fmt(p.kcal,0)} kcal · ${fmt(p.bialko)} g białka · ${fmt(p.woda,2)} l wody</div></button>`).join('')
+    : '<p class="hint">Baza produktów jest pusta — dodaj coś poniżej.</p>';
+}
+$('#foodPopList').addEventListener('click',e=>{
+  const b=e.target.closest('[data-fpid]'); if(!b) return;
+  const p=state.products.find(x=>x.id===b.dataset.fpid); if(!p) return;
+  addQuickMeal(p.name,p.bialko,p.woda,p.kcal);
+  $('#foodPop').classList.remove('open');
+});
+$('#fpAddBtn').addEventListener('click',()=>{
+  const name=$('#fpName').value.trim();
+  if(!name){ toast('Wpisz nazwę posiłku'); return; }
+  const b=parseNum($('#fpB').value), w=parseNum($('#fpW').value), k=parseNum($('#fpK').value);
+  addQuickMeal(name,b,w,k);
+  if($('#fpSave').checked){
+    const ex=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(ex){ ex.bialko=b; ex.woda=w; ex.kcal=k; }
+    else state.products.push({id:uid(),name,bialko:b,woda:w,kcal:k});
+    save();
+  }
+  $('#fpName').value=''; $('#fpB').value=''; $('#fpW').value=''; $('#fpK').value='';
+  $('#foodPop').classList.remove('open');
+});
 $('#waterPop').addEventListener('click',e=>{
   const b=e.target.closest('[data-ml]'); if(!b) return;
   const ml=Number(b.dataset.ml);
@@ -1127,6 +1281,9 @@ function renderSummary(){
   const exs=dayExStats(currentDay);
   $('#kSpal').textContent = exs.kcal ? '~'+fmt(exs.kcal,0) : '0';
   $('#kBilans').textContent = fmt(t.kcal-exs.kcal,0);
+  const slMinSum=daySleepMin(currentDay);
+  $('#kSen').textContent = slMinSum ? fmtDur(slMinSum) : '—';
+  $('#kSenT').textContent = tg.sleepH ? 'cel: '+fmt(tg.sleepH,1)+' h' : 'brak celu';
 
   const defs=[
     {lab:'Kalorie', v:t.kcal,  g:tg.kcal,  u:'kcal', dec:0},
@@ -1169,6 +1326,10 @@ function renderSummary(){
   if(tg.kcal   && t.kcal  >tg.kcal*1.1)   issues.push(`Kalorie — przekroczono o ${fmt(t.kcal-tg.kcal,0)} kcal`);
   if(!day || !day.exercises.length)        issues.push('Ćwiczenia — brak zapisanej aktywności dziś');
   if(tg.exMin && wMin<tg.exMin)            issues.push(`Ruch — do celu tygodnia (${fmt(tg.exMin,0)} min) brakuje ${fmt(tg.exMin-wMin,0)} min`);
+  if(tg.sleepH){
+    if(!slMinSum) issues.push('Sen — brak zapisu ostatniej nocy');
+    else if(slMinSum<tg.sleepH*60*0.95) issues.push(`Sen — za krótko o ${fmt(tg.sleepH*60-slMinSum,0)} min (cel: ${fmt(tg.sleepH,1)} h)`);
+  }
   const box=$('#improveBox');
   if(issues.length){
     box.className='improve';
@@ -1269,6 +1430,7 @@ $('#printBtn').addEventListener('click',()=>{
     ${exs.kcal?`<div class="foot"><b>🔥 Spalone (ćwiczenia, szacunkowo):</b> ~${fmt(exs.kcal,0)} kcal &nbsp;·&nbsp; <b>Bilans dnia (zjedzone − spalone):</b> ${fmt(t.kcal-exs.kcal,0)} kcal</div>`:''}
     ${weightHtml}
     ${exTableHtml}
+    ${daySleepMin(currentDay)?`<div class="foot"><b>😴 Sen (ostatnia noc):</b> ${fmtDur(daySleepMin(currentDay))}${tg.sleepH?' (cel: '+fmt(tg.sleepH,1)+' h)':''}</div>`:''}
     ${day.notes?`<div class="foot"><b>Sugestie trenera / Notatki:</b><br>${esc(day.notes).replace(/\n/g,'<br>')}</div>`:''}
     <div class="foot">${issues}</div>
   `);
@@ -1530,7 +1692,10 @@ function buildWeekReport(offset){
   const domCat=Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0]||null;
   // poprzedni tydzień (minuty) do porównania
   const prevMin=weekDaysArr(offset-1).reduce((a,iso)=>a+dayExStats(iso).min,0);
-  return {days,rows,logged:logged.length,avgKcal:avg('kcal'),avgB:avg('bialko'),avgW:avg('woda'),best,worst,wDelta,wA,wB,exTotal,exMinTotal,exKcalTotal,domCat,prevMin,tg};
+  // sen — średnia z nocy z wpisem
+  const sleepVals=days.map(iso=>daySleepMin(iso)).filter(m=>m>0);
+  const sleepAvg=sleepVals.length?sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length:null;
+  return {days,rows,logged:logged.length,avgKcal:avg('kcal'),avgB:avg('bialko'),avgW:avg('woda'),best,worst,wDelta,wA,wB,exTotal,exMinTotal,exKcalTotal,domCat,prevMin,sleepAvg,sleepN:sleepVals.length,tg};
 }
 function weekRowsTable(R,forPrint){
   const dayCell=r=>`${weekdayPL(r.iso).slice(0,3)}. ${fmtDatePL(r.iso).slice(0,5)}`;
@@ -1560,6 +1725,7 @@ function renderWeekReport(){
     ${kpi(String(R.exTotal),'treningi',tg.exSessions?'cel: '+fmt(tg.exSessions,0):'')}
     ${kpi(R.exMinTotal?fmt(R.exMinTotal,0):'0','minuty ruchu',tg.exMin?'cel: '+fmt(tg.exMin,0)+' min':'')}
     ${kpi(R.exKcalTotal?'~'+fmt(R.exKcalTotal,0):'0','kcal spalone','szacunkowo')}
+    ${kpi(R.sleepAvg!=null?fmtDur(Math.round(R.sleepAvg)):'—','śr. sen / noc',R.sleepAvg!=null?R.sleepN+' nocy z wpisem':(tg.sleepH?'cel: '+fmt(tg.sleepH,1)+' h':''))}
     ${kpi(R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—','zmiana wagi',R.wDelta!=null?fmtDatePL(R.wA.date)+' → '+fmtDatePL(R.wB.date):'brak 2 pomiarów')}
   </div>`;
   const exBits=[];
@@ -1586,6 +1752,7 @@ $('#printWeekBtn').addEventListener('click',()=>{
       <span>Treningi: <b>${R.exTotal}</b></span>
       <span>Czas ruchu: <b>${fmt(R.exMinTotal,0)} min</b></span>
       <span>Spalone: <b>~${fmt(R.exKcalTotal,0)} kcal</b></span>
+      <span>Śr. sen: <b>${R.sleepAvg!=null?fmtDur(Math.round(R.sleepAvg)):'—'}</b></span>
       <span>Zmiana wagi: <b>${R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—'}</b></span>
     </div>
     ${weekRowsTable(R,true)}
@@ -1603,7 +1770,40 @@ $('#printWeekBtn').addEventListener('click',()=>{
 });
 
 /* ================= STATYSTYKI ================= */
-let metricChart=null, intakeChart=null, mealTimesChart=null, corrChart=null, exWeekChart=null, exCatChart=null;
+let metricChart=null, intakeChart=null, mealTimesChart=null, corrChart=null, exWeekChart=null, exCatChart=null, sleepChart=null;
+
+/* ---------- statystyki snu ---------- */
+function renderSleepStats(){
+  const tg=state.profile.targets||{};
+  const t0=todayStr();
+  const labels=[],vals=[];
+  let withData=0,total=0,maxV=0,minV=Infinity;
+  for(let i=13;i>=0;i--){
+    const iso=isoAddDays(t0,-i);
+    labels.push(iso.slice(8,10)+'.'+iso.slice(5,7));
+    const m=daySleepMin(iso);
+    vals.push(m?Math.round(m/60*100)/100:0);
+    if(m){ withData++; total+=m; if(m>maxV)maxV=m; if(m<minV)minV=m; }
+  }
+  const kpi=(v,l,s)=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div><div class="s">${s||''}</div></div>`;
+  $('#sleepStatsKpis').innerHTML=
+    kpi(withData?fmtDur(Math.round(total/withData)):'—','śr. sen / noc',tg.sleepH?'cel: '+fmt(tg.sleepH,1)+' h':'')+
+    kpi(withData?fmtDur(maxV):'—','najdłuższy sen','')+
+    kpi(withData?fmtDur(minV):'—','najkrótszy sen','')+
+    kpi(withData+'/14','nocy z wpisem','');
+  if(typeof Chart==='undefined') return;
+  if(sleepChart) sleepChart.destroy();
+  sleepChart=new Chart($('#sleepChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Sen (h)',data:vals,backgroundColor:'rgba(142,68,173,.65)',borderRadius:6},
+      ...(tg.sleepH?[{type:'line',label:'Cel snu',data:vals.map(()=>tg.sleepH),borderColor:'#f39c12',borderDash:[7,5],pointRadius:0}]:[])
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},
+      tooltip:{callbacks:{label:c=>c.dataset.label==='Sen (h)'?` ${fmtDur(Math.round(c.parsed.y*60))}`:` cel: ${fmt(tg.sleepH,1)} h`}}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:'godziny'}}}}
+  });
+}
 
 /* ---------- statystyki aktywności ---------- */
 function renderExerciseStats(){
@@ -1671,6 +1871,7 @@ function renderStats(){
   renderStatsTable();
   renderCorrelations();
   renderExerciseStats();
+  renderSleepStats();
   if(typeof Chart==='undefined'){
     $('#metricChart').closest('.chartbox').innerHTML='<p class="hint">Wykresy wymagają połączenia z internetem (biblioteka Chart.js).</p>';
     return;
