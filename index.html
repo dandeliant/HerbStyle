@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0f9d76">
+<meta name="theme-color" content="#0f9d76" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101820" media="(prefers-color-scheme: dark)">
 <title>Zdrowe Nawyki — Dziennik Postępów</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -173,8 +174,48 @@
   .fabpop .fplist .sub{font-size:.74rem;color:var(--muted);font-weight:400}
   .fabpop .fpform input{margin-bottom:6px;padding:7px 9px;font-size:.88rem}
 
+  /* ---------- nawyki ---------- */
+  .habit{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .habit:last-child{border-bottom:none}
+  .habit input[type=checkbox]{width:21px;height:21px;accent-color:var(--brand);cursor:pointer;flex-shrink:0}
+  .habit .hname{font-weight:600}
+  .habit .hstats{margin-left:auto;font-size:.78rem;color:var(--muted);text-align:right;white-space:nowrap}
+  .habit.done .hname{color:var(--brand2)}
+
+  /* ---------- tryb ciemny (wg ustawień systemu/telefonu) ---------- */
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1519; --card:#18212a; --ink:#e6edf3; --muted:#93a5b3;
+      --line:#2a3743; --soft:#1e2b33; --brand:#17b98c; --brand2:#3ecfa5;
+    }
+    input[type=text],input[type=number],input[type=date],input[type=time],input[type=file],select,textarea{
+      background:#0f1822;color:var(--ink);border-color:var(--line);color-scheme:dark;
+    }
+    .card{box-shadow:0 2px 6px rgba(0,0,0,.3)}
+    .groupRow td{background:#2b2415;color:#f0b35c}
+    .meal>.mhead .hours{background:#2e2512;color:#f0b35c}
+    .improve{background:#2b1a1a;border-color:#5a2e2e}
+    .improve.ok{background:#152719;border-color:#2e5a3d}
+    .wg{background:linear-gradient(120deg,#142320,#141f2b);border-color:#24473a}
+    .wg .bigtrack,.pb .track{background:#223039}
+    .fabpop{background:var(--card);border-color:var(--line)}
+    .fabpop .fplist button{background:#0f1822;color:var(--ink);border-color:var(--line)}
+    .fabpop .fplist button:hover{background:#2b2415;border-color:var(--accent)}
+    .fabpop .fpgrid button{background:#122334;border-color:#24435e;color:#7db9e8}
+    .fabpop .fpgrid button:hover{background:var(--blue);color:#fff}
+    dialog{background:var(--card);color:var(--ink)}
+    .photocmp img{background:#0f1822}
+    .diff.zero{background:#26313a;color:var(--muted)}
+    .kpi .v{color:var(--brand2)}
+    header.top{box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  }
+
   /* ---------- print ---------- */
   #printArea{display:none}
+  @media print{
+    /* wydruk zawsze jasny, także w trybie ciemnym */
+    :root{--bg:#fff;--card:#fff;--ink:#000;--muted:#555;--line:#ccc;--soft:#f2f2f2}
+  }
   @media print{
     body{background:#fff}
     .app,.fab,.fabpop,.toast{display:none !important}
@@ -266,15 +307,31 @@
     </div>
 
     <div class="card">
+      <h2>✅ Nawyki dnia</h2>
+      <p class="hint">Zdefiniuj własne codzienne nawyki — odhaczysz je w <b>Dzienniku</b>, a aplikacja policzy skuteczność (% dni z ostatnich 30) i passę.</p>
+      <table id="habitsTable">
+        <thead><tr><th>Nawyk</th><th style="width:50px"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <br>
+      <button class="btn ghost" id="addHabitBtn">＋ Dodaj nawyk</button>
+    </div>
+
+    <div class="card">
       <h2>💾 Kopia zapasowa danych</h2>
       <div class="flexrow">
         <button class="btn primary" id="exportBtn">⬇️ Eksportuj dane (plik JSON)</button>
         <button class="btn orange" id="importBtn">⬆️ Importuj dane z pliku</button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       </div>
+      <div class="flexrow" style="margin-top:10px">
+        <button class="btn ghost" id="exportCsvDaysBtn">📊 CSV — dziennik (Excel)</button>
+        <button class="btn ghost" id="exportCsvMeasBtn">📊 CSV — pomiary (Excel)</button>
+      </div>
       <p class="hint">Eksport zawiera <b>wszystko</b>: profil, dziennik posiłków, pomiary, bazę produktów i zdjęcia sylwetki.
       Zapisz plik w bezpiecznym miejscu (np. Dysk Google) — to Twoje zabezpieczenie na wypadek wyczyszczenia danych przeglądarki.
-      Import <b>zastępuje</b> obecne dane danymi z pliku — użyj go też do przeniesienia danych między telefonem a komputerem.</p>
+      Import <b>zastępuje</b> obecne dane danymi z pliku — użyj go też do przeniesienia danych między telefonem a komputerem.
+      Pliki CSV (średnik jako separator, przecinek dziesiętny) otwierają się wprost w Excelu i Arkuszach Google — idealne dla trenera do własnych analiz.</p>
     </div>
   </section>
 
@@ -339,6 +396,15 @@
     </div>
 
     <div class="card">
+      <div class="flexrow" style="margin-bottom:6px">
+        <h2 style="margin:0">✅ Nawyki</h2>
+        <span class="pill" id="habitsPill" style="display:none"></span>
+      </div>
+      <div id="habitsBox"></div>
+      <p class="hint" id="habitsHint" style="display:none">Nie masz jeszcze nawyków — zdefiniuj je w zakładce <b>⚙️ Profil i cele</b>.</p>
+    </div>
+
+    <div class="card">
       <h2>📝 Sugestie trenera / Notatki</h2>
       <textarea id="dayNotes" placeholder="Notatki do tego dnia, uwagi trenera, samopoczucie..."></textarea>
     </div>
@@ -396,6 +462,20 @@
         <button class="btn primary" id="printWeekBtn">🖨️ Drukuj raport (dla trenera)</button>
       </div>
       <div id="weekReportWrap" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <div class="flexrow">
+        <h2 style="margin:0">📅 Raport miesięczny</h2>
+        <button class="btn small ghost" id="prevMonth">◀</button>
+        <span class="pill" id="monthLabel">—</span>
+        <button class="btn small ghost" id="nextMonth">▶</button>
+        <div class="spacer"></div>
+        <button class="btn primary" id="printMonthBtn">🖨️ Drukuj raport (dla trenera)</button>
+      </div>
+      <div id="monthReportWrap" style="margin-top:12px"></div>
+      <h3 style="margin-top:14px">Waga — średnia krocząca (wygładzenie z 3 pomiarów)</h3>
+      <div class="chartbox" style="min-height:240px"><canvas id="monthWeightChart"></canvas></div>
     </div>
 
     <div class="card">
@@ -615,6 +695,12 @@ function load(){
   if(st.profile.targets.exSessions===undefined) st.profile.targets.exSessions=3;
   if(!st.sleep) st.sleep=[];
   if(st.profile.targets.sleepH===undefined) st.profile.targets.sleepH=7;
+  if(!st.habits) st.habits=[
+    {id:'hb1',name:'Suplementy',created:todayStr()},
+    {id:'hb2',name:'Bez słodyczy',created:todayStr()},
+    {id:'hb3',name:'10 000 kroków',created:todayStr()},
+    {id:'hb4',name:'Bez jedzenia po 20:00',created:todayStr()},
+  ];
   return st;
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -681,10 +767,29 @@ function dayNumber(iso){
   return diff>=0 ? diff+1 : null;
 }
 function getDay(iso){
-  if(!state.days[iso]) state.days[iso] = {meals:[],exercises:[],notes:''};
+  if(!state.days[iso]) state.days[iso] = {meals:[],exercises:[],notes:'',habits:{}};
   const d = state.days[iso];
   if(!d.meals) d.meals=[]; if(!d.exercises) d.exercises=[]; if(d.notes==null) d.notes='';
+  if(!d.habits) d.habits={};
   return d;
+}
+/* ---------- nawyki ---------- */
+function habitChecked(iso,hid){ const d=state.days[iso]; return !!(d&&d.habits&&d.habits[hid]); }
+function habitStats(h){
+  let denom=0,num=0;
+  for(let i=0;i<30;i++){
+    const iso=isoAddDays(todayStr(),-i);
+    if(h.created && iso<h.created) break;
+    denom++;
+    if(habitChecked(iso,h.id)) num++;
+  }
+  let cur=0, iso=todayStr();
+  if(!habitChecked(iso,h.id)) iso=isoAddDays(iso,-1);
+  while(habitChecked(iso,h.id)){ cur++; iso=isoAddDays(iso,-1); }
+  const dates=Object.keys(state.days).filter(d=>habitChecked(d,h.id)).sort();
+  let best=0,run=0,prev=null;
+  for(const d of dates){ run=(prev&&isoAddDays(prev,1)===d)?run+1:1; if(run>best)best=run; prev=d; }
+  return {pct:denom?Math.round(num/denom*100):0,denom,cur,best:Math.max(best,cur)};
 }
 function dayTotals(iso){
   const d = state.days[iso];
@@ -890,7 +995,37 @@ function renderProfile(){
         <td class="num"><input type="number" step="0.1" style="width:110px;text-align:right" data-pm="${m.key}" data-fld="cel" value="${v.cel ?? ''}"></td>
       </tr>`);
   }
+  renderHabitsProfile();
 }
+function renderHabitsProfile(){
+  const tb=$('#habitsTable tbody'); tb.innerHTML='';
+  for(const h of state.habits){
+    tb.insertAdjacentHTML('beforeend',`
+      <tr data-hid="${h.id}">
+        <td><input type="text" value="${esc(h.name)}" data-hname placeholder="np. Suplementy, 10 000 kroków..."></td>
+        <td><button class="btn danger small" data-hdel="${h.id}">✕</button></td>
+      </tr>`);
+  }
+  if(!state.habits.length) tb.innerHTML='<tr><td colspan="2" class="hint">Brak nawyków — dodaj pierwszy.</td></tr>';
+}
+$('#addHabitBtn').addEventListener('click',()=>{
+  state.habits.push({id:uid(),name:'',created:todayStr()});
+  save(); renderHabitsProfile();
+  const rows=$$('#habitsTable tbody tr[data-hid]');
+  if(rows.length) rows[rows.length-1].querySelector('input').focus();
+});
+$('#habitsTable').addEventListener('input',e=>{
+  const tr=e.target.closest('tr[data-hid]'); if(!tr) return;
+  const h=state.habits.find(x=>x.id===tr.dataset.hid); if(!h) return;
+  h.name=e.target.value;
+  save();
+});
+$('#habitsTable').addEventListener('click',e=>{
+  const del=e.target.closest('[data-hdel]'); if(!del) return;
+  if(!confirm('Usunąć ten nawyk? Historia odhaczeń zostanie utracona.')) return;
+  state.habits=state.habits.filter(x=>x.id!==del.dataset.hdel);
+  save(); renderHabitsProfile();
+});
 $('#saveProfileBtn').addEventListener('click',()=>{
   state.profile.startDate = $('#pStartDate').value;
   state.profile.height    = parseNum($('#pHeight').value);
@@ -950,6 +1085,7 @@ $('#importFile').addEventListener('change',async e=>{
   if(!state.measurements) state.measurements=[];
   if(!state.days) state.days={};
   if(!state.sleep) state.sleep=[];
+  if(!state.habits) state.habits=[];
   save();
   await clearPhotos();
   for(const [id,dataUrl] of Object.entries(photos)){ try{ await putPhoto(id,dataUrl); }catch(err){} }
@@ -1057,9 +1193,41 @@ function renderDay(){
   renderStartStop();
 
   $('#dayNotes').value=day.notes||'';
+  renderHabits();
   renderSummary();
   renderWeightGoal();
 }
+function renderHabits(){
+  const box=$('#habitsBox');
+  const day=getDay(currentDay);
+  if(!state.habits.length){
+    box.innerHTML='';
+    $('#habitsHint').style.display='';
+    $('#habitsPill').style.display='none';
+    return;
+  }
+  $('#habitsHint').style.display='none';
+  box.innerHTML=state.habits.map(h=>{
+    const st=habitStats(h);
+    const done=!!day.habits[h.id];
+    return `<div class="habit ${done?'done':''}">
+      <input type="checkbox" data-habit="${h.id}" ${done?'checked':''}>
+      <span class="hname">${esc(h.name)||'<span class="hint">(bez nazwy)</span>'}</span>
+      <span class="hstats">ost. ${st.denom} dni: <b>${st.pct}%</b>${st.cur?` · 🔥 ${st.cur} dni`:''}${st.best>1?` (rekord ${st.best})`:''}</span>
+    </div>`;
+  }).join('');
+  const done=state.habits.filter(h=>day.habits[h.id]).length;
+  const hp=$('#habitsPill');
+  hp.style.display='';
+  hp.textContent=`${done}/${state.habits.length} dziś${done===state.habits.length&&done>0?' 🎉':''}`;
+}
+$('#habitsBox').addEventListener('change',e=>{
+  const cb=e.target.closest('[data-habit]'); if(!cb) return;
+  const day=getDay(currentDay);
+  if(cb.checked) day.habits[cb.dataset.habit]=true;
+  else delete day.habits[cb.dataset.habit];
+  save(); renderHabits();
+});
 
 /* delegacja zdarzeń dziennika */
 $('#mealsContainer').addEventListener('click',e=>{
@@ -1777,6 +1945,176 @@ $('#printWeekBtn').addEventListener('click',()=>{
   `);
 });
 
+/* ================= RAPORT MIESIĘCZNY ================= */
+let monthOffset=0;
+$('#prevMonth').addEventListener('click',()=>{ monthOffset--; renderMonthReport(); });
+$('#nextMonth').addEventListener('click',()=>{ if(monthOffset<0){ monthOffset++; renderMonthReport(); } });
+function monthInfo(offset){
+  const now=new Date();
+  const d=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  const y=d.getFullYear(),m=d.getMonth();
+  const first=y+'-'+String(m+1).padStart(2,'0')+'-01';
+  const n=new Date(y,m+1,0).getDate();
+  const days=Array.from({length:n},(_,i)=>isoAddDays(first,i));
+  const label=d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  return {days,label};
+}
+function periodAggregates(days){
+  let loggedDays=0,k=0,b=0,w=0,exMin=0,exKcal=0,exCnt=0,slSum=0,slN=0;
+  for(const iso of days){
+    const d=state.days[iso];
+    if(d&&d.meals&&d.meals.length){ const t=dayTotals(iso); loggedDays++; k+=t.kcal; b+=t.bialko; w+=t.woda; }
+    const es=dayExStats(iso); exMin+=es.min; exKcal+=es.kcal; exCnt+=es.count;
+    const s=daySleepMin(iso); if(s){ slSum+=s; slN++; }
+  }
+  return {
+    loggedDays,
+    avgK:loggedDays?k/loggedDays:null, avgB:loggedDays?b/loggedDays:null, avgW:loggedDays?w/loggedDays:null,
+    exMin,exKcal,exCnt, slAvg:slN?slSum/slN:null
+  };
+}
+function buildMonthReport(offset){
+  const {days,label}=monthInfo(offset);
+  const agg=periodAggregates(days);
+  const prevInfo=monthInfo(offset-1);
+  const prev=periodAggregates(prevInfo.days);
+  // tygodnie miesiąca (grupowane po poniedziałku)
+  const weekMap=new Map();
+  for(const iso of days){
+    const mon=weekDaysContaining(iso)[0];
+    if(!weekMap.has(mon)) weekMap.set(mon,[]);
+    weekMap.get(mon).push(iso);
+  }
+  const weeks=[...weekMap.entries()].map(([mon,ds])=>({mon,from:ds[0],to:ds[ds.length-1],agg:periodAggregates(ds)}));
+  // zmiana wagi w miesiącu
+  const wStart=lastWeightOnOrBefore(isoAddDays(days[0],-1));
+  const wEnd=lastWeightOnOrBefore(days[days.length-1]);
+  const wDelta=(wStart&&wEnd&&wEnd.date>wStart.date)?wEnd.v-wStart.v:null;
+  return {label,prevLabel:prevInfo.label,days,agg,prev,weeks,wDelta};
+}
+function monthDelta(v,pv,dec,goodUp){
+  if(v==null||pv==null) return '';
+  const diff=v-pv;
+  if(Math.abs(diff)<0.005) return ' <span class="diff zero">＝</span>';
+  const up=diff>0;
+  const good=goodUp?up:!up;
+  return ` <span class="diff ${good?'good':'bad'}">${up?'▲':'▼'} ${fmt(Math.abs(diff),dec)}</span>`;
+}
+function monthWeeksTable(R,forPrint){
+  const al=forPrint?'style="text-align:right"':'class="num"';
+  return `<table>
+    <thead><tr><th>Tydzień</th><th class="num">Dni z wpisami</th><th class="num">śr. kcal</th><th class="num">śr. białko (g)</th><th class="num">śr. woda (l)</th><th class="num">Ruch (min)</th><th class="num">śr. sen</th></tr></thead>
+    <tbody>${R.weeks.map(wk=>`<tr>
+      <td>${fmtDatePL(wk.from).slice(0,5)} – ${fmtDatePL(wk.to).slice(0,5)}</td>
+      <td ${al}>${wk.agg.loggedDays}</td>
+      <td ${al}>${wk.agg.avgK!=null?fmt(wk.agg.avgK,0):'—'}</td>
+      <td ${al}>${wk.agg.avgB!=null?fmt(wk.agg.avgB):'—'}</td>
+      <td ${al}>${wk.agg.avgW!=null?fmt(wk.agg.avgW,2):'—'}</td>
+      <td ${al}>${wk.agg.exMin?fmt(wk.agg.exMin,0):''}</td>
+      <td ${al}>${wk.agg.slAvg!=null?fmtDur(Math.round(wk.agg.slAvg)):'—'}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+function renderMonthReport(){
+  const R=buildMonthReport(monthOffset);
+  $('#monthLabel').textContent=R.label+(monthOffset===0?' (bieżący)':'');
+  const kpi=(v,l,s)=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div><div class="s">${s||''}</div></div>`;
+  let html=`<div class="kpis">
+    ${kpi(R.agg.loggedDays+'/'+R.days.length,'dni z wpisami',''+monthDelta(R.agg.loggedDays,R.prev.loggedDays,0,true))}
+    ${kpi(R.agg.avgK!=null?fmt(R.agg.avgK,0):'—','śr. kcal / dzień',''+monthDelta(R.agg.avgK,R.prev.avgK,0,false))}
+    ${kpi(R.agg.avgB!=null?fmt(R.agg.avgB):'—','śr. białko (g)',''+monthDelta(R.agg.avgB,R.prev.avgB,1,true))}
+    ${kpi(R.agg.avgW!=null?fmt(R.agg.avgW,2):'—','śr. woda (l)',''+monthDelta(R.agg.avgW,R.prev.avgW,2,true))}
+    ${kpi(fmt(R.agg.exMin,0),'min ruchu',''+monthDelta(R.agg.exMin,R.prev.exMin,0,true))}
+    ${kpi(R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—','śr. sen / noc',''+monthDelta(R.agg.slAvg!=null?R.agg.slAvg/60:null,R.prev.slAvg!=null?R.prev.slAvg/60:null,1,true))}
+    ${kpi(R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—','zmiana wagi','w tym miesiącu')}
+  </div>
+  <p class="hint">Strzałki = porównanie z poprzednim miesiącem (${R.prevLabel}).</p>
+  <div class="tscroll">${monthWeeksTable(R,false)}</div>`;
+  $('#monthReportWrap').innerHTML=html;
+  renderMonthWeightChart();
+}
+let monthWeightChart=null;
+function renderMonthWeightChart(){
+  if(typeof Chart==='undefined') return;
+  const pts=weightSeries();
+  const ma=pts.map((p,i)=>{
+    const w=pts.slice(Math.max(0,i-2),i+1);
+    return Math.round(w.reduce((a,x)=>a+x.v,0)/w.length*100)/100;
+  });
+  if(monthWeightChart) monthWeightChart.destroy();
+  monthWeightChart=new Chart($('#monthWeightChart'),{
+    type:'line',
+    data:{labels:pts.map(p=>fmtDatePL(p.date)),datasets:[
+      {label:'Waga (kg)',data:pts.map(p=>p.v),borderColor:'rgba(15,157,118,.45)',pointRadius:4,pointBackgroundColor:'#0f9d76',tension:.1},
+      {label:'Średnia krocząca (3 pomiary)',data:ma,borderColor:'#f39c12',borderWidth:3,pointRadius:0,tension:.35}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:false}}}
+  });
+}
+$('#printMonthBtn').addEventListener('click',()=>{
+  const R=buildMonthReport(monthOffset);
+  doPrint(`
+    <h1>🌿 Raport miesięczny — ${R.label}</h1>
+    <div class="phead">
+      <span>Dni z wpisami: <b>${R.agg.loggedDays}/${R.days.length}</b></span>
+      <span>Ruch: <b>${fmt(R.agg.exMin,0)} min</b> (~${fmt(R.agg.exKcal,0)} kcal)</span>
+      <span>Śr. sen: <b>${R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—'}</b></span>
+      <span>Zmiana wagi: <b>${R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—'}</b></span>
+    </div>
+    <h2>Tygodnie miesiąca</h2>
+    ${monthWeeksTable(R,true)}
+    <h2>Porównanie z poprzednim miesiącem (${R.prevLabel})</h2>
+    <table><thead><tr><th></th><th style="text-align:right">${R.label}</th><th style="text-align:right">${R.prevLabel}</th></tr></thead><tbody>
+      <tr><td>Dni z wpisami</td><td style="text-align:right">${R.agg.loggedDays}</td><td style="text-align:right">${R.prev.loggedDays}</td></tr>
+      <tr><td>Śr. kalorie (kcal/d)</td><td style="text-align:right">${R.agg.avgK!=null?fmt(R.agg.avgK,0):'—'}</td><td style="text-align:right">${R.prev.avgK!=null?fmt(R.prev.avgK,0):'—'}</td></tr>
+      <tr><td>Śr. białko (g/d)</td><td style="text-align:right">${R.agg.avgB!=null?fmt(R.agg.avgB):'—'}</td><td style="text-align:right">${R.prev.avgB!=null?fmt(R.prev.avgB):'—'}</td></tr>
+      <tr><td>Śr. woda (l/d)</td><td style="text-align:right">${R.agg.avgW!=null?fmt(R.agg.avgW,2):'—'}</td><td style="text-align:right">${R.prev.avgW!=null?fmt(R.prev.avgW,2):'—'}</td></tr>
+      <tr><td>Ruch (min)</td><td style="text-align:right">${fmt(R.agg.exMin,0)}</td><td style="text-align:right">${fmt(R.prev.exMin,0)}</td></tr>
+      <tr><td>Śr. sen / noc</td><td style="text-align:right">${R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—'}</td><td style="text-align:right">${R.prev.slAvg!=null?fmtDur(Math.round(R.prev.slAvg)):'—'}</td></tr>
+    </tbody></table>
+  `);
+});
+
+/* ================= EKSPORT CSV ================= */
+function csvCell(v){ v=String(v??''); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function csvNum(n,dec=2){ if(n==null||isNaN(n)) return ''; return String(Math.round(n*10**dec)/10**dec).replace('.',','); }
+function downloadCsv(name,rows){
+  const csv='﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n'); // BOM — polskie znaki w Excelu
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+$('#exportCsvDaysBtn').addEventListener('click',()=>{
+  const habitCols=state.habits.map(h=>h.name||'(nawyk)');
+  const rows=[['Data','Dzień tygodnia','Kalorie (kcal)','Białko (g)','Woda (l)','Posiłki','Ruch (min)','Spalone (kcal)','Sen (h)',...habitCols]];
+  const allDates=[...new Set([...Object.keys(state.days),...state.sleep.map(s=>s.endDate)])].filter(Boolean).sort();
+  for(const iso of allDates){
+    const t=dayTotals(iso);
+    const es=dayExStats(iso);
+    const sl=daySleepMin(iso);
+    rows.push([
+      fmtDatePL(iso), weekdayPL(iso),
+      csvNum(t.kcal,0), csvNum(t.bialko,1), csvNum(t.woda,2), String(t.posilki),
+      es.min?csvNum(es.min,0):'', es.kcal?csvNum(es.kcal,0):'', sl?csvNum(sl/60,2):'',
+      ...state.habits.map(h=>habitChecked(iso,h.id)?'TAK':'')
+    ]);
+  }
+  downloadCsv('herbstyle-dziennik-'+todayStr()+'.csv',rows);
+  toast('📊 CSV dziennika pobrany');
+});
+$('#exportCsvMeasBtn').addEventListener('click',()=>{
+  const rows=[['Data',...METRICS.map(m=>m.label+(m.unit?' ('+m.unit+')':''))]];
+  const sVals=METRICS.map(m=>csvNum(state.profile.metrics[m.key]?.start));
+  if(sVals.some(v=>v!=='')) rows.push(['START'+(state.profile.startDate?' '+fmtDatePL(state.profile.startDate):''),...sVals]);
+  for(const ms of [...state.measurements].sort((a,b)=>a.date.localeCompare(b.date))){
+    rows.push([fmtDatePL(ms.date),...METRICS.map(m=>csvNum(ms.values[m.key]))]);
+  }
+  const gVals=METRICS.map(m=>csvNum(state.profile.metrics[m.key]?.cel));
+  if(gVals.some(v=>v!=='')) rows.push(['CEL',...gVals]);
+  downloadCsv('herbstyle-pomiary-'+todayStr()+'.csv',rows);
+  toast('📊 CSV pomiarów pobrany');
+});
+
 /* ================= STATYSTYKI ================= */
 let metricChart=null, intakeChart=null, mealTimesChart=null, corrChart=null, exWeekChart=null, exCatChart=null, sleepChart=null;
 
@@ -1876,6 +2214,7 @@ function initStatSelectors(){
 
 function renderStats(){
   renderWeekReport();
+  renderMonthReport();
   renderStatsTable();
   renderCorrelations();
   renderExerciseStats();
@@ -2111,6 +2450,11 @@ function renderStatsTable(){
 /* ================= PWA ================= */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+/* wykresy w trybie ciemnym */
+if(typeof Chart!=='undefined' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches){
+  Chart.defaults.color='#c3cfd9';
+  Chart.defaults.borderColor='rgba(255,255,255,.09)';
 }
 
 /* ================= START ================= */
