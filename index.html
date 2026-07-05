@@ -502,6 +502,8 @@
       <div class="flexrow" style="margin-bottom:10px">
         <h2 style="margin:0">😴 Sen</h2>
         <span class="pill" id="sleepPill" style="display:none"></span>
+        <div class="spacer"></div>
+        <button class="btn orange" id="sleepStartStopBtn">🌙 Zasypiam</button>
       </div>
       <div class="tscroll"><table id="sleepTable">
         <thead><tr><th>Zasnięcie — data</th><th>godz.</th><th>Pobudka — data</th><th>godz.</th><th class="num">Czas snu</th><th></th></tr></thead>
@@ -1292,19 +1294,24 @@ function renderDay(){
       </tr>`);
   }
 
-  // sen (przypisany do dnia pobudki)
+  // sen (przypisany do dnia pobudki; trwający sen widoczny od razu)
   const slTb=$('#sleepTable tbody'); slTb.innerHTML='';
-  for(const s of (state.sleep||[]).filter(x=>x.endDate===currentDay)){
+  const sleepVisible=(state.sleep||[]).filter(x=>
+    x.endDate===currentDay ||
+    (x.live && !x.endDate && (x.startDate===currentDay || x.startDate===isoAddDays(currentDay,-1)))
+  );
+  for(const s of sleepVisible){
     slTb.insertAdjacentHTML('beforeend',`
       <tr data-slid="${s.id}">
         <td><input type="date" value="${s.startDate||''}" data-slfld="startDate" style="width:140px"></td>
         <td><input type="time" value="${s.start||''}" data-slfld="start" style="width:96px"></td>
         <td><input type="date" value="${s.endDate||''}" data-slfld="endDate" style="width:140px"></td>
         <td><input type="time" value="${s.end||''}" data-slfld="end" style="width:96px"></td>
-        <td class="num"><span class="sldur">${fmtDur(sleepDurMin(s))}</span></td>
+        <td class="num"><span class="sldur">${fmtDur(sleepDurMin(s))}</span>${s.live?' <span class="pill" style="background:#e8e3f5;color:#6d4bb5">● trwa</span>':''}</td>
         <td><button class="btn danger small" data-sldel="${s.id}">✕</button></td>
       </tr>`);
   }
+  renderSleepStartStop();
   const slM=daySleepMin(currentDay);
   const sp=$('#sleepPill');
   if(slM){
@@ -1446,6 +1453,42 @@ $('#exTable').addEventListener('input',e=>{
   if(span) span.textContent=k!=null?'~'+fmt(k,0):'';
   save(); renderSummary();
 });
+/* ---------- sen: przycisk zasypiam / pobudka ---------- */
+function findLiveSleep(){
+  return (state.sleep||[]).find(s=>s.live) || null;
+}
+$('#sleepStartStopBtn').addEventListener('click',()=>{
+  const live=findLiveSleep();
+  if(live){
+    // pobudka — koniec snu teraz, wpis trafia do dnia pobudki
+    live.live=false;
+    live.endDate=todayStr();
+    live.end=nowTime();
+    save();
+    currentDay=todayStr();
+    renderDay();
+    const d=sleepDurMin(live);
+    toast(`☀️ Dzień dobry! Spałeś ${d?fmtDur(d):'—'}`);
+  } else {
+    state.sleep.push({id:uid(),startDate:todayStr(),start:nowTime(),endDate:'',end:'',live:true});
+    save();
+    currentDay=todayStr();
+    renderDay();
+    toast('🌙 Dobranoc! Sen rozpoczęty — kliknij „Pobudka” po przebudzeniu');
+  }
+});
+function renderSleepStartStop(){
+  const b=$('#sleepStartStopBtn');
+  const live=findLiveSleep();
+  if(live){
+    b.textContent=`☀️ Pobudka (śpisz od ${live.start||'?'}${live.startDate&&live.startDate!==todayStr()?', '+fmtDatePL(live.startDate):''})`;
+    b.classList.remove('orange'); b.classList.add('primary');
+  } else {
+    b.textContent='🌙 Zasypiam';
+    b.classList.remove('primary'); b.classList.add('orange');
+  }
+}
+
 /* ---------- sen: dodawanie / edycja / usuwanie ---------- */
 $('#addSleepBtn').addEventListener('click',()=>{
   state.sleep.push({id:uid(),startDate:isoAddDays(currentDay,-1),start:'23:00',endDate:currentDay,end:'07:00'});
@@ -1469,6 +1512,7 @@ $('#sleepTable').addEventListener('input',e=>{
       if(di) di.value=s.endDate;
     }
   }
+  if(s.live && s.end && s.endDate) s.live=false; // ręczne dopisanie pobudki kończy tryb „na żywo”
   const span=tr.querySelector('.sldur');
   if(span) span.textContent=fmtDur(sleepDurMin(s));
   // odśwież plakietkę snu
