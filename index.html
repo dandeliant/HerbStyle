@@ -1175,6 +1175,14 @@ $('#sleepTable').addEventListener('input',e=>{
   }
   const span=tr.querySelector('.sldur');
   if(span) span.textContent=fmtDur(sleepDurMin(s));
+  // odśwież plakietkę snu
+  const slM2=daySleepMin(currentDay);
+  const sp2=$('#sleepPill');
+  if(slM2){
+    const tgS2=state.profile.targets.sleepH;
+    sp2.style.display='';
+    sp2.textContent=`${fmtDur(slM2)}${tgS2?' / cel '+fmt(tgS2,1)+' h':''}${tgS2&&slM2>=tgS2*60?' ✔':''}`;
+  } else sp2.style.display='none';
   save(); renderSummary();
 });
 
