@@ -168,6 +168,14 @@
   .fabpop button:hover{background:var(--blue);color:#fff}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--ink);color:#fff;padding:10px 20px;border-radius:24px;opacity:0;pointer-events:none;transition:.3s;z-index:60;font-size:.92rem}
   .toast.show{opacity:1}
+
+  /* ---------- stopka ---------- */
+  footer.sitefoot{
+    margin-top:28px;padding:20px 12px 14px;border-top:1px solid var(--line);
+    text-align:center;color:var(--muted);font-size:.8rem;line-height:1.7;
+  }
+  footer.sitefoot .brand{font-weight:700;color:var(--brand2);font-size:.9rem}
+  footer.sitefoot .copy b{color:var(--ink)}
   .fabpop .fplist{max-height:210px;overflow-y:auto;margin-bottom:8px}
   .fabpop .fplist button{display:block;width:100%;text-align:left;margin-bottom:4px;background:#fff;border:1px solid var(--line);color:var(--ink);font-weight:600;border-radius:8px;padding:7px 10px;cursor:pointer}
   .fabpop .fplist button:hover{border-color:var(--accent);background:#fdf6ea}
@@ -580,6 +588,12 @@
   </div>
   <div class="fab" id="foodFab" title="Szybkie dodanie jedzenia" style="bottom:86px;background:var(--accent);box-shadow:0 6px 16px rgba(243,156,18,.45)">🍽️</div>
   <div class="toast" id="toast"></div>
+
+  <footer class="sitefoot">
+    <div class="brand">🌿 HerbStyle — Dziennik Zdrowych Nawyków</div>
+    <div class="copy">Autor i wykonanie: <b>Daniel Ostrowski</b></div>
+    <div class="copy">Copyright © <span id="copyYear"></span> Daniel Ostrowski. Wszelkie prawa zastrzeżone.</div>
+  </footer>
 </div>
 
 <!-- ============ MODAL POMIARU ============ -->
