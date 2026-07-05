@@ -19,7 +19,10 @@ Dane zapisują się automatycznie w pamięci przeglądarki (localStorage).
 - **🍽️ Szybkie jedzenie** — drugi pływający przycisk: dodanie posiłku jednym kliknięciem z bazy produktów albo nowej pozycji z makro (białko/woda/kcal) z opcją zapisania jej w bazie.
 - **😴 Sen** — zasnięcie i pobudka z datą i godziną, automatyczne liczenie czasu snu (także przez północ), edytowalny cel (domyślnie 7 h/noc), analiza: wykres 14 dni z linią celu, średnia/najdłuższy/najkrótszy sen, sen w podsumowaniu dnia, „Do poprawy” i raporcie tygodniowym.
 - **🏋️ Ćwiczenia** — start/koniec z automatycznym liczeniem czasu (także przez północ), przycisk ▶/⏹ „trening na żywo”, kategorie aktywności, intensywność 1–5, szacunek spalonych kalorii (MET × intensywność × waga × czas), bilans dnia (zjedzone − spalone), cel tygodniowy (minuty i treningi), passa dni z ruchem, wykres minut/tydzień i rozkładu kategorii, ruch w korelacjach i raporcie tygodniowym.
-- **💾 Kopia zapasowa** — eksport i import wszystkich danych (łącznie ze zdjęciami) do pliku JSON.
+- **✅ Nawyki dnia** — własne odhaczane nawyki (definiowane w profilu) ze skutecznością % z 30 dni i passą.
+- **📅 Raport miesięczny** — tygodnie miesiąca obok siebie, porównanie miesiąc do miesiąca, średnia krocząca wagi, wydruk dla trenera.
+- **💾 Kopia zapasowa** — eksport i import wszystkich danych (łącznie ze zdjęciami) do pliku JSON; dodatkowo eksport CSV (dziennik + pomiary) do Excela/Arkuszy Google.
+- **🌙 Tryb ciemny** — automatyczny, według ustawień systemu/telefonu.
 - **📱 PWA** — aplikację można zainstalować na telefonie (Dodaj do ekranu głównego); działa offline.
 
 ## Automatyczna synchronizacja
