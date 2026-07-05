@@ -182,6 +182,7 @@
   .fabpop .fplist .sub{font-size:.74rem;color:var(--muted);font-weight:400}
   .fabpop .fpform input{margin-bottom:6px;padding:7px 9px;font-size:.88rem}
 
+
   /* ---------- nawyki ---------- */
   .habit{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--line)}
   .habit:last-child{border-bottom:none}
@@ -904,7 +905,11 @@ function toast(msg){
   const el=$('#toast'); el.textContent=msg; el.classList.add('show');
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
 }
-function doPrint(html){ $('#printArea').innerHTML=html; window.print(); }
+function doPrint(html){
+  $('#printArea').innerHTML=html
+    +`<div class="foot" style="margin-top:6mm;text-align:center;color:#555;border-top:1px solid #999;padding-top:2mm">HerbStyle — Dziennik Zdrowych Nawyków · Copyright © ${new Date().getFullYear()} Daniel Ostrowski. Wszelkie prawa zastrzeżone.</div>`;
+  window.print();
+}
 
 /* ================= TABS ================= */
 $$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
@@ -2472,6 +2477,7 @@ if(typeof Chart!=='undefined' && window.matchMedia && matchMedia('(prefers-color
 }
 
 /* ================= START ================= */
+$('#copyYear').textContent=new Date().getFullYear();
 initStatSelectors();
 renderHeader();
 renderProfile();
