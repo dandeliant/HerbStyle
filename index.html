@@ -1866,14 +1866,16 @@ function renderSummary(){
 }
 
 /* ---------- drukowanie dnia ---------- */
-function arrowFor(total,target,kind){
-  // kind: 'kcal' (za dużo = źle) | 'more' (za mało = źle: białko, woda)
+function arrowFor(total,target,kind,unit,dec){
+  // kind: 'kcal' (za dużo = źle) | 'more' (za mało = źle)
   if(target==null) return '';
   const diff=total-target;
   if(Math.abs(diff)<=target*0.02) return ' <span class="arr good">＝ w celu</span>';
   const up=diff>0;
   const arrow=up?'⬆':'⬇';
-  const txt=up?('za dużo o '+(kind==='kcal'?fmt(diff,0)+' kcal':fmt(diff,2))):('za mało o '+(kind==='kcal'?fmt(-diff,0)+' kcal':fmt(-diff,2)));
+  const d=dec!=null?dec:(kind==='kcal'?0:2);
+  const u=unit?' '+unit:(kind==='kcal'?' kcal':'');
+  const txt=(up?'za dużo o ':'za mało o ')+fmt(Math.abs(diff),d)+u;
   const bad=(kind==='kcal')?up:!up;
   return ` <span class="arr ${bad?'bad':'good'}">${arrow} ${txt}</span>`;
 }
@@ -1949,7 +1951,7 @@ $('#printBtn').addEventListener('click',()=>{
       <thead><tr><th style="width:60px">Czas</th><th>Posiłek</th>${ens.map(N=>`<th style="width:72px">${N.label} (${N.unit})</th>`).join('')}</tr></thead>
       <tbody>
         ${rows||`<tr><td colspan="${cols}">Brak zapisanych posiłków.</td></tr>`}
-        <tr class="tot"><td colspan="2">Razem:</td>${ens.map(N=>`<td style="text-align:right">${fmt(t[N.key],N.dec)}${arrowFor(t[N.key],nutrientTarget(N.key),N.dir==='less'?'kcal':'more')}</td>`).join('')}</tr>
+        <tr class="tot"><td colspan="2">Razem:</td>${ens.map(N=>`<td style="text-align:right">${fmt(t[N.key],N.dec)}${arrowFor(t[N.key],nutrientTarget(N.key),N.dir==='less'?'kcal':'more',N.unit,N.dec)}</td>`).join('')}</tr>
         <tr class="tot"><td colspan="2">Dzienne zapotrzebowanie:</td>${ens.map(N=>`<td style="text-align:right">${fmt(nutrientTarget(N.key),N.dec)}</td>`).join('')}</tr>
       </tbody>
     </table>
@@ -2273,7 +2275,7 @@ function renderWeekReport(){
 $('#printWeekBtn').addEventListener('click',()=>{
   const R=buildWeekReport(weekOffset);
   const tg=R.tg;
-  const arrAvg=(v,t,kind)=>v==null?'':arrowFor(v,t,kind);
+  const arrAvg=(v,t,kind,unit,dec)=>v==null?'':arrowFor(v,t,kind,unit,dec);
   doPrint(`
     <h1>🌿 Raport tygodniowy — ${fmtDatePL(R.days[0])} – ${fmtDatePL(R.days[6])}</h1>
     <div class="phead">
@@ -2287,9 +2289,9 @@ $('#printWeekBtn').addEventListener('click',()=>{
     ${weekRowsTable(R,true)}
     <h2>Średnie dzienne vs cel</h2>
     <table><thead><tr><th></th><th style="text-align:right">Średnio / dzień</th><th style="text-align:right">Cel</th><th>Ocena</th></tr></thead><tbody>
-      <tr><td>Kalorie (kcal)</td><td style="text-align:right">${fmt(R.avgKcal,0)}</td><td style="text-align:right">${fmt(tg.kcal,0)}</td><td>${arrAvg(R.avgKcal,tg.kcal,'kcal')}</td></tr>
-      <tr><td>Białko (g)</td><td style="text-align:right">${fmt(R.avgB)}</td><td style="text-align:right">${fmt(tg.bialko,0)}</td><td>${arrAvg(R.avgB,tg.bialko,'more')}</td></tr>
-      <tr><td>Woda (l)</td><td style="text-align:right">${fmt(R.avgW,2)}</td><td style="text-align:right">${fmt(tg.woda,1)}</td><td>${arrAvg(R.avgW,tg.woda,'more')}</td></tr>
+      <tr><td>Kalorie (kcal)</td><td style="text-align:right">${fmt(R.avgKcal,0)}</td><td style="text-align:right">${fmt(tg.kcal,0)}</td><td>${arrAvg(R.avgKcal,tg.kcal,'kcal','kcal',0)}</td></tr>
+      <tr><td>Białko (g)</td><td style="text-align:right">${fmt(R.avgB)}</td><td style="text-align:right">${fmt(tg.bialko,0)}</td><td>${arrAvg(R.avgB,tg.bialko,'more','g',1)}</td></tr>
+      <tr><td>Woda (l)</td><td style="text-align:right">${fmt(R.avgW,2)}</td><td style="text-align:right">${fmt(tg.woda,1)}</td><td>${arrAvg(R.avgW,tg.woda,'more','l',2)}</td></tr>
     </tbody></table>
     ${R.best?`<div class="foot">🏆 Najlepszy dzień: <b>${weekdayPL(R.best.iso)} ${fmtDatePL(R.best.iso)}</b> (${R.best.score}%)${R.worst&&R.worst.iso!==R.best.iso?` &nbsp;·&nbsp; Najsłabszy: <b>${weekdayPL(R.worst.iso)} ${fmtDatePL(R.worst.iso)}</b> (${R.worst.score}%)`:''}</div>`:''}
     ${printBarRow('Śr. kalorie',R.avgKcal??0,tg.kcal,'kcal',0,'less')}
@@ -2872,6 +2874,7 @@ if(typeof Chart!=='undefined' && window.matchMedia && matchMedia('(prefers-color
 
 /* ================= START ================= */
 $('#copyYear').textContent=new Date().getFullYear();
+applyNutrientVisibility();
 initStatSelectors();
 renderHeader();
 renderProfile();
