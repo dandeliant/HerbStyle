@@ -228,6 +228,13 @@
   .fabpop .fplist .sub{font-size:.74rem;color:var(--muted);font-weight:400}
   .fabpop .fpform input{margin-bottom:6px;padding:8px 10px;font-size:.88rem}
 
+  /* ---------- posiłek poza optymalnym oknem ---------- */
+  input.badtime{
+    border-color:var(--bad) !important;
+    background:rgba(220,38,38,.08) !important;
+    color:var(--bad);font-weight:700;
+  }
+
   /* ---------- stopka ---------- */
   footer.sitefoot{
     margin-top:32px;padding:22px 12px 14px;border-top:1px solid var(--line);
@@ -406,6 +413,17 @@
         <div><label class="f">Sen — godziny / noc</label><input type="number" step="0.5" id="tSleepH" placeholder="np. 7"></div>
       </div>
       <p class="hint">Te wartości pojawią się w podsumowaniu każdego dnia jako punkt odniesienia. Cel ruchu jest liczony w skali tygodnia (pon.–niedz.).</p>
+    </div>
+
+    <div class="card">
+      <h2>⏰ Optymalne godziny posiłków</h2>
+      <p class="hint">Dostosuj okna czasowe do swojego trybu dnia — każdy ma inny rytm. Posiłek wpisany <b>poza swoim oknem</b> zostanie oznaczony w Dzienniku <span style="color:var(--bad);font-weight:700">na czerwono</span> (pole godziny), trafi do sekcji „Do poprawy” i pojawi się jako czerwony punkt na wykresie pór posiłków.</p>
+      <div class="tscroll">
+        <table id="mealWindowsTable">
+          <thead><tr><th>Posiłek</th><th>Od</th><th>Do</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
@@ -634,6 +652,12 @@
     </div>
 
     <div class="card">
+      <h2>🍱 Średnie wartości posiłków — ostatnie 30 dni</h2>
+      <div class="tscroll" id="mealAvgWrap"></div>
+      <p class="hint">Średnie liczone z dni, w których dany posiłek został zapisany. „Udział %” pokazuje, jaka część wszystkich kalorii przypada na ten posiłek — od razu widać, który posiłek dostarcza najwięcej energii.</p>
+    </div>
+
+    <div class="card">
       <h2>⏰ Pory posiłków i treningów — ostatnie 14 dni</h2>
       <p class="hint" id="lastMealAvg"></p>
       <div class="chartbox"><canvas id="mealTimesChart"></canvas></div>
@@ -827,6 +851,12 @@ function load(){
     {id:'hb3',name:'10 000 kroków',created:todayStr()},
     {id:'hb4',name:'Bez jedzenia po 20:00',created:todayStr()},
   ];
+  if(!st.profile.mealWindows){
+    st.profile.mealWindows={};
+    for(const M of MEALS){
+      if(M.win) st.profile.mealWindows[M.key]={from:hourToTimeStr(M.win[0]),to:hourToTimeStr(M.win[1])};
+    }
+  }
   return st;
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -935,6 +965,23 @@ function computeBMI(weight){
   return weight/((h/100)**2);
 }
 function timeToHours(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); if(isNaN(h)) return null; return h+(m||0)/60; }
+function hourToTimeStr(h){ const hh=Math.floor(h), mm=Math.round((h-hh)*60); return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
+/* okno czasowe posiłku: z profilu użytkownika, z domyślnymi wartościami MEALS */
+function mealWindow(key){
+  const w=state.profile.mealWindows && state.profile.mealWindows[key];
+  if(w&&w.from&&w.to){
+    const a=timeToHours(w.from), b=timeToHours(w.to);
+    if(a!=null&&b!=null&&b>a) return [a,b];
+  }
+  const M=MEALS.find(x=>x.key===key);
+  return (M&&M.win)?M.win:null;
+}
+function mealHoursLabel(key){ const w=mealWindow(key); return w?hourToTimeStr(w[0])+' – '+hourToTimeStr(w[1]):''; }
+function timeOutsideWindow(key,time){
+  const w=mealWindow(key); const h=timeToHours(time);
+  if(!w||h==null) return false;
+  return h<w[0]||h>w[1];
+}
 /* ---------- ćwiczenia: czas trwania, kalorie, tygodnie, passa ---------- */
 function currentWeightKg(){ const pts=weightSeries(); return pts.length?pts[pts.length-1].v:70; }
 function exDurMin(ex){
@@ -1126,7 +1173,29 @@ function renderProfile(){
       </tr>`);
   }
   renderHabitsProfile();
+  renderMealWindows();
 }
+function renderMealWindows(){
+  const tb=$('#mealWindowsTable tbody'); tb.innerHTML='';
+  for(const M of MEALS){
+    if(!M.win) continue; // "Inne" nie ma okna
+    const w=(state.profile.mealWindows&&state.profile.mealWindows[M.key])||{from:hourToTimeStr(M.win[0]),to:hourToTimeStr(M.win[1])};
+    tb.insertAdjacentHTML('beforeend',`
+      <tr>
+        <td><b>${M.label}</b></td>
+        <td><input type="time" value="${w.from||''}" data-mwkey="${M.key}" data-mwfld="from" style="width:110px"></td>
+        <td><input type="time" value="${w.to||''}" data-mwkey="${M.key}" data-mwfld="to" style="width:110px"></td>
+      </tr>`);
+  }
+}
+$('#mealWindowsTable').addEventListener('input',e=>{
+  const k=e.target.dataset.mwkey, f=e.target.dataset.mwfld;
+  if(!k||!f) return;
+  if(!state.profile.mealWindows) state.profile.mealWindows={};
+  if(!state.profile.mealWindows[k]) state.profile.mealWindows[k]={from:'',to:''};
+  state.profile.mealWindows[k][f]=e.target.value;
+  save();
+});
 function renderHabitsProfile(){
   const tb=$('#habitsTable tbody'); tb.innerHTML='';
   for(const h of state.habits){
@@ -1249,11 +1318,12 @@ function renderDay(){
   for(const M of MEALS){
     const entries=day.meals.filter(m=>m.type===M.key);
     const mt=entries.reduce((a,m)=>({k:a.k+(parseNum(m.kcal)??0),b:a.b+(parseNum(m.bialko)??0),w:a.w+(parseNum(m.woda)??0)}),{k:0,b:0,w:0});
+    const hoursLbl=mealHoursLabel(M.key);
     const box=document.createElement('div'); box.className='meal';
     box.innerHTML=`
       <div class="mhead">
         <span class="t">${M.label}</span>
-        ${M.hours?`<span class="hours">⏰ optymalnie ${M.hours}</span>`:''}
+        ${hoursLbl?`<span class="hours">⏰ optymalnie ${hoursLbl}</span>`:''}
         <span class="spacer"></span>
         <span class="mtot">${fmt(mt.k,0)} kcal · ${fmt(mt.b)} g białka · ${fmt(mt.w,2)} l wody</span>
       </div>
@@ -1261,7 +1331,7 @@ function renderDay(){
         <thead><tr><th>Czas</th><th>Co spożyto</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Kalorie (kcal)</th><th></th></tr></thead>
         <tbody>${entries.map(e=>`
           <tr data-id="${e.id}">
-            <td><input type="time" value="${e.time||''}" data-fld="time"></td>
+            <td><input type="time" value="${e.time||''}" data-fld="time" class="${timeOutsideWindow(M.key,e.time)?'badtime':''}" ${timeOutsideWindow(M.key,e.time)?'title="Poza optymalnym oknem ('+hoursLbl+')"':''}></td>
             <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc"></td>
             <td class="num"><input type="number" step="0.1" value="${e.bialko??''}" data-fld="bialko"></td>
             <td class="num"><input type="number" step="0.05" value="${e.woda??''}" data-fld="woda"></td>
@@ -1409,6 +1479,11 @@ $('#mealsContainer').addEventListener('input',e=>{
   const m=day.meals.find(x=>x.id===tr.dataset.id); if(!m) return;
   const f=e.target.dataset.fld;
   m[f]=e.target.value;
+  if(f==='time'){
+    const outside=timeOutsideWindow(m.type,m.time);
+    e.target.classList.toggle('badtime',outside);
+    e.target.title=outside?'Poza optymalnym oknem ('+mealHoursLabel(m.type)+')':'';
+  }
   save(); refreshMealTotals(); renderSummary();
 });
 function refreshMealTotals(){
@@ -1678,6 +1753,9 @@ function renderSummary(){
     if(!slMinSum) issues.push('Sen — brak zapisu ostatniej nocy');
     else if(slMinSum<tg.sleepH*60*0.95) issues.push(`Sen — za krótko o ${fmt(tg.sleepH*60-slMinSum,0)} min (cel: ${fmt(tg.sleepH,1)} h)`);
   }
+  let outsideCnt=0;
+  if(day) for(const m of day.meals){ if(m.time&&timeOutsideWindow(m.type,m.time)) outsideCnt++; }
+  if(outsideCnt) issues.push(`Pory posiłków — ${outsideCnt} ${outsideCnt===1?'wpis':(outsideCnt<5?'wpisy':'wpisów')} poza optymalnym oknem`);
   const box=$('#improveBox');
   if(issues.length){
     box.className='improve';
@@ -1720,8 +1798,12 @@ $('#printBtn').addEventListener('click',()=>{
   for(const M of MEALS){
     const es=day.meals.filter(m=>m.type===M.key);
     if(!es.length) continue;
-    rows+=`<tr><td colspan="5" class="sec">${M.label}${M.hours?` (optymalnie ${M.hours})`:''}</td></tr>`;
-    rows+=es.map(e=>`<tr><td>${e.time||''}</td><td>${esc(e.desc||'')}</td><td style="text-align:right">${fmt(parseNum(e.bialko))}</td><td style="text-align:right">${fmt(parseNum(e.woda),2)}</td><td style="text-align:right">${fmt(parseNum(e.kcal),0)}</td></tr>`).join('');
+    const hoursLbl=mealHoursLabel(M.key);
+    rows+=`<tr><td colspan="5" class="sec">${M.label}${hoursLbl?` (optymalnie ${hoursLbl})`:''}</td></tr>`;
+    rows+=es.map(e=>{
+      const outside=e.time&&timeOutsideWindow(M.key,e.time);
+      return `<tr><td${outside?' style="color:#c0392b;font-weight:700"':''}>${e.time||''}${outside?' ⚠':''}</td><td>${esc(e.desc||'')}</td><td style="text-align:right">${fmt(parseNum(e.bialko))}</td><td style="text-align:right">${fmt(parseNum(e.woda),2)}</td><td style="text-align:right">${fmt(parseNum(e.kcal),0)}</td></tr>`;
+    }).join('');
   }
   const exs=dayExStats(currentDay);
   const exRows=day.exercises.map(e=>{
@@ -2391,6 +2473,7 @@ function renderStats(){
   renderCorrelations();
   renderExerciseStats();
   renderSleepStats();
+  renderMealAverages();
   if(typeof Chart==='undefined'){
     $('#metricChart').closest('.chartbox').innerHTML='<p class="hint">Wykresy wymagają połączenia z internetem (biblioteka Chart.js).</p>';
     return;
@@ -2448,6 +2531,48 @@ function renderIntakeChart(){
   });
 }
 
+/* ---------- średnie wartości posiłków (30 dni) ---------- */
+function renderMealAverages(){
+  const wrap=$('#mealAvgWrap');
+  const acc={};
+  for(const M of MEALS) acc[M.key]={k:0,b:0,w:0,cnt:0,days:new Set()};
+  for(let i=0;i<30;i++){
+    const iso=isoAddDays(todayStr(),-i);
+    const d=state.days[iso];
+    if(!d||!d.meals) continue;
+    for(const m of d.meals){
+      const a=acc[m.type]; if(!a) continue;
+      const kc=parseNum(m.kcal)??0, bi=parseNum(m.bialko)??0, wo=parseNum(m.woda)??0;
+      if(kc||bi||wo||(m.desc&&m.desc.trim())){
+        a.k+=kc; a.b+=bi; a.w+=wo; a.cnt++; a.days.add(iso);
+      }
+    }
+  }
+  const totalK=MEALS.reduce((s,M)=>s+acc[M.key].k,0);
+  if(!totalK && !MEALS.some(M=>acc[M.key].cnt)){
+    wrap.innerHTML='<p class="hint">Brak wpisów z ostatnich 30 dni — uzupełnij dziennik, a tutaj zobaczysz, ile średnio dostarcza Ci każdy posiłek.</p>';
+    return;
+  }
+  let rows='';
+  for(const M of MEALS){
+    const a=acc[M.key];
+    const n=a.days.size;
+    const share=totalK?Math.round(a.k/totalK*100):0;
+    rows+=`<tr>
+      <td><b>${M.label}</b></td>
+      <td class="num">${n||'—'}</td>
+      <td class="num">${n?fmt(a.k/n,0):'—'}</td>
+      <td class="num">${n?fmt(a.b/n):'—'}</td>
+      <td class="num">${n?fmt(a.w/n,2):'—'}</td>
+      <td style="min-width:140px">${n?`<div class="pb" style="margin:0"><div class="track" style="height:10px"><div class="fill" style="width:${share}%"></div></div></div>`:''}</td>
+      <td class="num">${n?share+'%':'—'}</td>
+    </tr>`;
+  }
+  wrap.innerHTML=`<table>
+    <thead><tr><th>Posiłek</th><th class="num">Dni z wpisem</th><th class="num">śr. kcal</th><th class="num">śr. białko (g)</th><th class="num">śr. woda (l)</th><th>Udział w kaloriach</th><th class="num">%</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
 /* ---------- pory posiłków ---------- */
 function renderMealTimesChart(){
   const t0=todayStr();
@@ -2456,25 +2581,31 @@ function renderMealTimesChart(){
   for(let i=13;i>=0;i--){ const iso=isoAddDays(t0,-i); daysIso.push(iso); labels.push(iso.slice(8,10)+'.'+iso.slice(5,7)); }
 
   const datasets=[];
-  // pasma optymalnych okien (rysowane jako wypełnienie między dwiema liniami)
+  // pasma optymalnych okien z profilu (rysowane jako wypełnienie między dwiema liniami)
   for(const M of MEALS){
-    if(!M.win) continue;
-    datasets.push({label:'_w1'+M.key,type:'line',data:[{x:-0.5,y:M.win[1]},{x:13.5,y:M.win[1]}],pointRadius:0,borderWidth:0,fill:false,showLine:true});
-    datasets.push({label:'_w2'+M.key,type:'line',data:[{x:-0.5,y:M.win[0]},{x:13.5,y:M.win[0]}],pointRadius:0,borderWidth:0,fill:'-1',backgroundColor:'rgba(243,156,18,.12)',showLine:true});
+    const w=mealWindow(M.key);
+    if(!w) continue;
+    datasets.push({label:'_w1'+M.key,type:'line',data:[{x:-0.5,y:w[1]},{x:13.5,y:w[1]}],pointRadius:0,borderWidth:0,fill:false,showLine:true});
+    datasets.push({label:'_w2'+M.key,type:'line',data:[{x:-0.5,y:w[0]},{x:13.5,y:w[0]}],pointRadius:0,borderWidth:0,fill:'-1',backgroundColor:'rgba(243,156,18,.12)',showLine:true});
   }
-  // punkty posiłków
+  // punkty posiłków (czerwone = poza optymalnym oknem)
   const lastMealPerDay=[];
   for(const M of MEALS){
-    const data=[];
+    const data=[],colors=[],radii=[];
     daysIso.forEach((iso,ix)=>{
       const d=state.days[iso];
       if(!d) return;
       for(const meal of d.meals.filter(x=>x.type===M.key)){
         const h=timeToHours(meal.time);
-        if(h!=null) data.push({x:ix,y:h});
+        if(h!=null){
+          data.push({x:ix,y:h});
+          const outside=timeOutsideWindow(M.key,meal.time);
+          colors.push(outside?'#dc2626':MEAL_COLORS[M.key]);
+          radii.push(outside?6:5);
+        }
       }
     });
-    datasets.push({label:M.label,type:'scatter',data,backgroundColor:MEAL_COLORS[M.key],pointRadius:5});
+    datasets.push({label:M.label,type:'scatter',data,backgroundColor:colors,pointRadius:radii,pointBorderColor:colors});
   }
   // treningi (godzina startu)
   const trainData=[];
