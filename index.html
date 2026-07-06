@@ -132,6 +132,7 @@
   .meal table input[type=number]{width:84px;text-align:right}
   .meal table input[type=time]{width:104px}
   .meal .addrow{padding:10px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .meal tr.mealsum td{background:var(--soft);font-weight:700;color:var(--brand2);border-top:2px solid var(--line);font-variant-numeric:tabular-nums}
   .meal .addrow select{max-width:280px;width:auto}
   @media(max-width:820px){.meal table input[type=text]{min-width:150px}}
 
@@ -354,6 +355,7 @@
     #printArea .phead{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:3mm;font-size:12px}
     #printArea .phead span{border:1px solid #444;border-radius:6px;padding:2px 10px}
     #printArea .tot td{font-weight:700;background:#dce9f5}
+    #printArea .subtot td{font-weight:700;background:#eef5ea}
     #printArea .sec{font-weight:700;background:#f7ecd8}
     #printArea .foot{margin-top:4mm;font-size:11px}
     #printArea .pbarrow{margin:2mm 0}
@@ -1378,22 +1380,24 @@ function renderDay(){
   const prodOpts=productOptions();
 
   const ens=enabledNutrients();
-  const mealTotStr=entries=>{
+  const mealSums=entries=>{
     const mt={}; ens.forEach(N=>mt[N.key]=0);
     entries.forEach(m=>ens.forEach(N=>mt[N.key]+=parseNum(m[N.key])??0));
-    return ens.map(N=>`${N.label}: ${fmt(mt[N.key],N.dec)} ${N.unit}`).join(' · ')||'—';
+    return mt;
   };
   const cont=$('#mealsContainer'); cont.innerHTML='';
   for(const M of MEALS){
     const entries=day.meals.filter(m=>m.type===M.key);
     const hoursLbl=mealHoursLabel(M.key);
+    const mt=mealSums(entries);
+    const mtotStr=ens.map(N=>`${N.label}: ${fmt(mt[N.key],N.dec)} ${N.unit}`).join(' · ')||'—';
     const box=document.createElement('div'); box.className='meal';
     box.innerHTML=`
       <div class="mhead">
         <span class="t">${M.label}</span>
         ${hoursLbl?`<span class="hours">⏰ optymalnie ${hoursLbl}</span>`:''}
         <span class="spacer"></span>
-        <span class="mtot">${mealTotStr(entries)}</span>
+        <span class="mtot">${mtotStr}</span>
       </div>
       ${entries.length?`<div class="tscroll"><table>
         <thead><tr><th>Czas</th><th>Co spożyto</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr></thead>
@@ -1404,6 +1408,11 @@ function renderDay(){
             ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" value="${e[N.key]??''}" data-fld="${N.key}"></td>`).join('')}
             <td style="white-space:nowrap"><button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
           </tr>`).join('')}
+          <tr class="mealsum">
+            <td colspan="2">Σ Razem — ${M.label}</td>
+            ${ens.map(N=>`<td class="num" data-msum="${N.key}">${fmt(mt[N.key],N.dec)}</td>`).join('')}
+            <td></td>
+          </tr>
         </tbody></table></div>`:''}
       <div class="addrow">
         <button class="btn ghost small" data-add="${M.key}">＋ Dodaj pozycję</button>
@@ -1568,6 +1577,10 @@ function refreshMealTotals(){
     const mt={}; ens.forEach(N=>mt[N.key]=0);
     entries.forEach(m=>ens.forEach(N=>mt[N.key]+=parseNum(m[N.key])??0));
     box.querySelector('.mtot').textContent=ens.map(N=>`${N.label}: ${fmt(mt[N.key],N.dec)} ${N.unit}`).join(' · ')||'—';
+    ens.forEach(N=>{
+      const cell=box.querySelector(`[data-msum="${N.key}"]`);
+      if(cell) cell.textContent=fmt(mt[N.key],N.dec);
+    });
   });
 }
 
@@ -1907,6 +1920,8 @@ $('#printBtn').addEventListener('click',()=>{
       const outside=e.time&&timeOutsideWindow(M.key,e.time);
       return `<tr><td${outside?' style="color:#c0392b;font-weight:700"':''}>${e.time||''}${outside?' ⚠':''}</td><td>${esc(e.desc||'')}</td>${ens.map(N=>`<td style="text-align:right">${fmt(parseNum(e[N.key]),N.dec)}</td>`).join('')}</tr>`;
     }).join('');
+    const ms={}; ens.forEach(N=>ms[N.key]=es.reduce((a,e)=>a+(parseNum(e[N.key])??0),0));
+    rows+=`<tr class="subtot"><td colspan="2">Razem — ${M.label}:</td>${ens.map(N=>`<td style="text-align:right">${fmt(ms[N.key],N.dec)}</td>`).join('')}</tr>`;
   }
   const exs=dayExStats(currentDay);
   const exRows=day.exercises.map(e=>{
