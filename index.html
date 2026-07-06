@@ -404,10 +404,15 @@
 
     <div class="card">
       <h2>🎯 Dzienne zapotrzebowanie (cele dnia)</h2>
+      <p class="hint" style="margin-top:0">Zaznacz, które składniki odżywcze chcesz śledzić — <b>tylko zaznaczone</b> pojawią się w tabelach dziennika, podsumowaniu dnia, bazie produktów i na wydruku. Wartości zapotrzebowania są wstępnie ustawione na przeciętne dzienne normy zdrowej osoby dorosłej — możesz je dowolnie zmienić (np. wg zaleceń trenera).</p>
+      <div class="tscroll">
+        <table id="nutrientsTable">
+          <thead><tr><th style="width:64px">Śledź</th><th>Składnik</th><th class="num">Dzienne zapotrzebowanie</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <br>
       <div class="grid3">
-        <div><label class="f">Kalorie (kcal)</label><input type="number" id="tKcal" placeholder="np. 1800"></div>
-        <div><label class="f">Białko (g)</label><input type="number" id="tBialko" placeholder="np. 120"></div>
-        <div><label class="f">Woda (l)</label><input type="number" step="0.1" id="tWoda" placeholder="np. 3"></div>
         <div><label class="f">Ruch — minuty / tydzień</label><input type="number" id="tExMin" placeholder="np. 150 (zalecenie WHO)"></div>
         <div><label class="f">Ruch — treningi / tydzień</label><input type="number" id="tExSessions" placeholder="np. 3"></div>
         <div><label class="f">Sen — godziny / noc</label><input type="number" step="0.5" id="tSleepH" placeholder="np. 7"></div>
@@ -713,11 +718,7 @@
     <div class="fplist" id="foodPopList"></div>
     <div class="fpform" style="border-top:1px solid var(--line);padding-top:8px">
       <input type="text" id="fpName" placeholder="nowy produkt / posiłek...">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-        <input type="number" id="fpB" placeholder="białko g" step="0.1">
-        <input type="number" id="fpW" placeholder="woda l" step="0.05">
-        <input type="number" id="fpK" placeholder="kcal" step="1">
-      </div>
+      <div id="fpNutriGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px"></div>
       <label style="font-size:.8rem;display:flex;gap:6px;align-items:center;margin:2px 0 8px;color:var(--muted)"><input type="checkbox" id="fpSave" checked style="width:auto"> zapisz też w bazie produktów</label>
       <button class="btn primary small" id="fpAddBtn" style="width:100%">＋ Dodaj do dziennika</button>
     </div>
@@ -800,6 +801,37 @@ const MEALS = [
 ];
 const MEAL_COLORS = {sniadanie:'#0f9d76',przekaska1:'#8e44ad',lunch:'#2f6fb0',przekaska2:'#d35400',kolacja:'#c0392b',inne:'#7f8c8d'};
 
+/* składniki odżywcze możliwe do śledzenia; def = przeciętne dzienne zapotrzebowanie
+   zdrowej osoby dorosłej (GDA/WHO), dir: 'more' = niedobór to problem, 'less' = nadmiar to problem */
+const NUTRIENTS = [
+  {key:'bialko', label:'Białko',      unit:'g',    dec:1, step:'0.1',  def:100,  dir:'more'},
+  {key:'woda',   label:'Woda',        unit:'l',    dec:2, step:'0.05', def:3,    dir:'more'},
+  {key:'kcal',   label:'Kalorie',     unit:'kcal', dec:0, step:'1',    def:2000, dir:'less'},
+  {key:'wegle',  label:'Węglowodany', unit:'g',    dec:1, step:'1',    def:260,  dir:'less'},
+  {key:'tluszcz',label:'Tłuszcz',     unit:'g',    dec:1, step:'0.1',  def:70,   dir:'less'},
+  {key:'cukry',  label:'Cukry',       unit:'g',    dec:1, step:'0.1',  def:50,   dir:'less'},
+  {key:'blonnik',label:'Błonnik',     unit:'g',    dec:1, step:'0.1',  def:30,   dir:'more'},
+  {key:'sol',    label:'Sól',         unit:'g',    dec:1, step:'0.1',  def:5,    dir:'less'},
+];
+function ensureNutrients(st){
+  if(!st.profile.nutrients){
+    const t=st.profile.targets||{};
+    st.profile.nutrients={};
+    for(const N of NUTRIENTS){
+      const legacy={bialko:t.bialko,woda:t.woda,kcal:t.kcal}[N.key];
+      st.profile.nutrients[N.key]={on:['bialko','woda','kcal'].includes(N.key), target: legacy!=null?legacy:N.def};
+    }
+  }
+  for(const N of NUTRIENTS){ if(!st.profile.nutrients[N.key]) st.profile.nutrients[N.key]={on:false,target:N.def}; }
+  // stare pola targets zawsze pochodną włączonych składników (używa ich reszta aplikacji)
+  st.profile.targets.kcal   = st.profile.nutrients.kcal.on   ? st.profile.nutrients.kcal.target   : null;
+  st.profile.targets.bialko = st.profile.nutrients.bialko.on ? st.profile.nutrients.bialko.target : null;
+  st.profile.targets.woda   = st.profile.nutrients.woda.on   ? st.profile.nutrients.woda.target   : null;
+}
+function enabledNutrients(){ return NUTRIENTS.filter(N=>state.profile.nutrients[N.key]&&state.profile.nutrients[N.key].on); }
+function nutrientTarget(key){ const n=state.profile.nutrients[key]; return (n&&n.on&&n.target!=null)?n.target:null; }
+function syncLegacyTargets(){ ensureNutrients(state); }
+
 /* kategorie aktywności + wartości MET (do szacowania kalorii) */
 const EX_CATS = [
   {label:'🚶 Spacer',            met:3.5},
@@ -857,6 +889,7 @@ function load(){
       if(M.win) st.profile.mealWindows[M.key]={from:hourToTimeStr(M.win[0]),to:hourToTimeStr(M.win[1])};
     }
   }
+  ensureNutrients(st);
   return st;
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -949,12 +982,11 @@ function habitStats(h){
 }
 function dayTotals(iso){
   const d = state.days[iso];
-  const t = {kcal:0,bialko:0,woda:0,posilki:0};
+  const t = {posilki:0};
+  for(const N of NUTRIENTS) t[N.key]=0;
   if(!d) return t;
   for(const m of d.meals){
-    t.kcal   += parseNum(m.kcal)   ?? 0;
-    t.bialko += parseNum(m.bialko) ?? 0;
-    t.woda   += parseNum(m.woda)   ?? 0;
+    for(const N of NUTRIENTS) t[N.key] += parseNum(m[N.key]) ?? 0;
     if(m.desc && m.desc.trim()) t.posilki++;
   }
   return t;
@@ -1149,9 +1181,7 @@ function renderProfile(){
   $('#pStartDate').value   = state.profile.startDate || '';
   $('#pStartWeight').value = state.profile.metrics?.waga?.start ?? '';
   $('#pHeight').value      = state.profile.height ?? '';
-  $('#tKcal').value   = state.profile.targets.kcal   ?? '';
-  $('#tBialko').value = state.profile.targets.bialko ?? '';
-  $('#tWoda').value   = state.profile.targets.woda   ?? '';
+  renderNutrientsProfile();
   $('#tExMin').value      = state.profile.targets.exMin      ?? '';
   $('#tExSessions').value = state.profile.targets.exSessions ?? '';
   $('#tSleepH').value     = state.profile.targets.sleepH     ?? '';
@@ -1174,6 +1204,34 @@ function renderProfile(){
   }
   renderHabitsProfile();
   renderMealWindows();
+}
+function renderNutrientsProfile(){
+  const tb=$('#nutrientsTable tbody'); tb.innerHTML='';
+  for(const N of NUTRIENTS){
+    const n=state.profile.nutrients[N.key];
+    tb.insertAdjacentHTML('beforeend',`
+      <tr>
+        <td style="text-align:center"><input type="checkbox" data-nuton="${N.key}" ${n.on?'checked':''} style="width:20px;height:20px;accent-color:var(--brand);cursor:pointer"></td>
+        <td><b>${N.label}</b> <span class="hint">(${N.unit})</span></td>
+        <td class="num"><input type="number" step="${N.step}" value="${n.target??''}" data-nuttarget="${N.key}" style="width:120px;text-align:right" ${n.on?'':'disabled'}></td>
+      </tr>`);
+  }
+}
+$('#nutrientsTable').addEventListener('change',e=>{
+  const k=e.target.dataset.nuton;
+  if(!k) return;
+  state.profile.nutrients[k].on=e.target.checked;
+  syncLegacyTargets(); save();
+  renderNutrientsProfile(); renderDay(); renderProducts(); applyNutrientVisibility();
+});
+$('#nutrientsTable').addEventListener('input',e=>{
+  const k=e.target.dataset.nuttarget;
+  if(!k) return;
+  state.profile.nutrients[k].target=parseNum(e.target.value);
+  syncLegacyTargets(); save(); renderSummary();
+});
+function applyNutrientVisibility(){
+  $('#waterFab').style.display = state.profile.nutrients.woda.on ? '' : 'none';
 }
 function renderMealWindows(){
   const tb=$('#mealWindowsTable tbody'); tb.innerHTML='';
@@ -1228,14 +1286,10 @@ $('#habitsTable').addEventListener('click',e=>{
 $('#saveProfileBtn').addEventListener('click',()=>{
   state.profile.startDate = $('#pStartDate').value;
   state.profile.height    = parseNum($('#pHeight').value);
-  state.profile.targets = {
-    kcal:   parseNum($('#tKcal').value),
-    bialko: parseNum($('#tBialko').value),
-    woda:   parseNum($('#tWoda').value),
-    exMin:      parseNum($('#tExMin').value),
-    exSessions: parseNum($('#tExSessions').value),
-    sleepH:     parseNum($('#tSleepH').value),
-  };
+  state.profile.targets.exMin      = parseNum($('#tExMin').value);
+  state.profile.targets.exSessions = parseNum($('#tExSessions').value);
+  state.profile.targets.sleepH     = parseNum($('#tSleepH').value);
+  syncLegacyTargets();
   $$('#profileMetricsTable input').forEach(inp=>{
     const k=inp.dataset.pm, f=inp.dataset.fld;
     if(!state.profile.metrics[k]) state.profile.metrics[k]={};
@@ -1285,6 +1339,7 @@ $('#importFile').addEventListener('change',async e=>{
   if(!state.days) state.days={};
   if(!state.sleep) state.sleep=[];
   if(!state.habits) state.habits=[];
+  ensureNutrients(state);
   save();
   await clearPhotos();
   for(const [id,dataUrl] of Object.entries(photos)){ try{ await putPhoto(id,dataUrl); }catch(err){} }
@@ -1301,9 +1356,17 @@ $('#nextDay').addEventListener('click',()=>shiftDay(1));
 $('#todayBtn').addEventListener('click',()=>{ currentDay=todayStr(); renderDay(); });
 function shiftDay(n){ currentDay=isoAddDays(currentDay,n); renderDay(); }
 
+function productSummary(p){
+  const parts=enabledNutrients().filter(N=>p[N.key]!=null).slice(0,3)
+    .map(N=>`${fmt(p[N.key],N.dec)} ${N.unit==='kcal'?'kcal':N.unit+' '+N.label.toLowerCase()}`);
+  return parts.join(', ');
+}
 function productOptions(){
   if(!state.products.length) return '';
-  return state.products.map(p=>`<option value="${p.id}">${esc(p.name)} (${fmt(p.kcal,0)} kcal, ${fmt(p.bialko)} g białka)</option>`).join('');
+  return state.products.map(p=>{
+    const s=productSummary(p);
+    return `<option value="${p.id}">${esc(p.name)}${s?' ('+s+')':''}</option>`;
+  }).join('');
 }
 
 function renderDay(){
@@ -1314,10 +1377,15 @@ function renderDay(){
   const day=getDay(currentDay);
   const prodOpts=productOptions();
 
+  const ens=enabledNutrients();
+  const mealTotStr=entries=>{
+    const mt={}; ens.forEach(N=>mt[N.key]=0);
+    entries.forEach(m=>ens.forEach(N=>mt[N.key]+=parseNum(m[N.key])??0));
+    return ens.map(N=>`${N.label}: ${fmt(mt[N.key],N.dec)} ${N.unit}`).join(' · ')||'—';
+  };
   const cont=$('#mealsContainer'); cont.innerHTML='';
   for(const M of MEALS){
     const entries=day.meals.filter(m=>m.type===M.key);
-    const mt=entries.reduce((a,m)=>({k:a.k+(parseNum(m.kcal)??0),b:a.b+(parseNum(m.bialko)??0),w:a.w+(parseNum(m.woda)??0)}),{k:0,b:0,w:0});
     const hoursLbl=mealHoursLabel(M.key);
     const box=document.createElement('div'); box.className='meal';
     box.innerHTML=`
@@ -1325,17 +1393,15 @@ function renderDay(){
         <span class="t">${M.label}</span>
         ${hoursLbl?`<span class="hours">⏰ optymalnie ${hoursLbl}</span>`:''}
         <span class="spacer"></span>
-        <span class="mtot">${fmt(mt.k,0)} kcal · ${fmt(mt.b)} g białka · ${fmt(mt.w,2)} l wody</span>
+        <span class="mtot">${mealTotStr(entries)}</span>
       </div>
       ${entries.length?`<div class="tscroll"><table>
-        <thead><tr><th>Czas</th><th>Co spożyto</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Kalorie (kcal)</th><th></th></tr></thead>
+        <thead><tr><th>Czas</th><th>Co spożyto</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr></thead>
         <tbody>${entries.map(e=>`
           <tr data-id="${e.id}">
             <td><input type="time" value="${e.time||''}" data-fld="time" class="${timeOutsideWindow(M.key,e.time)?'badtime':''}" ${timeOutsideWindow(M.key,e.time)?'title="Poza optymalnym oknem ('+hoursLbl+')"':''}></td>
             <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc"></td>
-            <td class="num"><input type="number" step="0.1" value="${e.bialko??''}" data-fld="bialko"></td>
-            <td class="num"><input type="number" step="0.05" value="${e.woda??''}" data-fld="woda"></td>
-            <td class="num"><input type="number" step="1" value="${e.kcal??''}" data-fld="kcal"></td>
+            ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" value="${e[N.key]??''}" data-fld="${N.key}"></td>`).join('')}
             <td style="white-space:nowrap"><button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
           </tr>`).join('')}
         </tbody></table></div>`:''}
@@ -1450,8 +1516,13 @@ $('#mealsContainer').addEventListener('click',e=>{
     if(!m || !m.desc || !m.desc.trim()){ toast('Wpisz najpierw nazwę posiłku'); return; }
     const name=m.desc.trim();
     const ex=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
-    if(ex){ ex.bialko=parseNum(m.bialko); ex.woda=parseNum(m.woda); ex.kcal=parseNum(m.kcal); toast('⭐ Zaktualizowano w bazie: '+name); }
-    else { state.products.push({id:uid(),name,bialko:parseNum(m.bialko),woda:parseNum(m.woda),kcal:parseNum(m.kcal)}); toast('⭐ Zapisano w bazie: '+name); }
+    if(ex){ for(const N of NUTRIENTS) ex[N.key]=parseNum(m[N.key]); toast('⭐ Zaktualizowano w bazie: '+name); }
+    else {
+      const np={id:uid(),name};
+      for(const N of NUTRIENTS) np[N.key]=parseNum(m[N.key]);
+      state.products.push(np);
+      toast('⭐ Zapisano w bazie: '+name);
+    }
     save(); renderDay();
     return;
   }
@@ -1469,7 +1540,9 @@ $('#mealsContainer').addEventListener('change',e=>{
   sel.value='';
   if(!p) return;
   const day=getDay(currentDay);
-  day.meals.push({id:uid(),type:sel.dataset.prodsel,time:nowTime(),desc:p.name,bialko:p.bialko,woda:p.woda,kcal:p.kcal,createdAt:new Date().toISOString()});
+  const entry={id:uid(),type:sel.dataset.prodsel,time:nowTime(),desc:p.name,createdAt:new Date().toISOString()};
+  for(const N of NUTRIENTS) entry[N.key]=p[N.key]??null;
+  day.meals.push(entry);
   save(); renderDay();
   toast('＋ '+p.name);
 });
@@ -1488,11 +1561,13 @@ $('#mealsContainer').addEventListener('input',e=>{
 });
 function refreshMealTotals(){
   const day=getDay(currentDay);
+  const ens=enabledNutrients();
   $$('#mealsContainer .meal').forEach((box,i)=>{
     const M=MEALS[i];
     const entries=day.meals.filter(m=>m.type===M.key);
-    const mt=entries.reduce((a,m)=>({k:a.k+(parseNum(m.kcal)??0),b:a.b+(parseNum(m.bialko)??0),w:a.w+(parseNum(m.woda)??0)}),{k:0,b:0,w:0});
-    box.querySelector('.mtot').textContent=`${fmt(mt.k,0)} kcal · ${fmt(mt.b)} g białka · ${fmt(mt.w,2)} l wody`;
+    const mt={}; ens.forEach(N=>mt[N.key]=0);
+    entries.forEach(m=>ens.forEach(N=>mt[N.key]+=parseNum(m[N.key])??0));
+    box.querySelector('.mtot').textContent=ens.map(N=>`${N.label}: ${fmt(mt[N.key],N.dec)} ${N.unit}`).join(' · ')||'—';
   });
 }
 
@@ -1639,11 +1714,13 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#waterPop')) $('#waterPop').classList.remove('open');
   if(!e.target.closest('#foodPop'))  $('#foodPop').classList.remove('open');
 });
-function addQuickMeal(name,b,w,k){
+function addQuickMeal(name,vals){
   const iso=todayStr();
   const now=new Date();
   const type=mealTypeForHour(now.getHours()+now.getMinutes()/60);
-  getDay(iso).meals.push({id:uid(),type,time:nowTime(),desc:name,bialko:b,woda:w,kcal:k,createdAt:now.toISOString()});
+  const entry={id:uid(),type,time:nowTime(),desc:name,createdAt:now.toISOString()};
+  for(const N of NUTRIENTS) entry[N.key]=vals[N.key]??null;
+  getDay(iso).meals.push(entry);
   save();
   if(currentDay===iso) renderDay();
   toast('🍽️ + '+name);
@@ -1651,27 +1728,39 @@ function addQuickMeal(name,b,w,k){
 function renderFoodPop(){
   const list=$('#foodPopList');
   list.innerHTML=state.products.length
-    ? state.products.map(p=>`<button data-fpid="${p.id}">${esc(p.name)}<div class="sub">${fmt(p.kcal,0)} kcal · ${fmt(p.bialko)} g białka · ${fmt(p.woda,2)} l wody</div></button>`).join('')
+    ? state.products.map(p=>{
+        const s=productSummary(p);
+        return `<button data-fpid="${p.id}">${esc(p.name)}${s?`<div class="sub">${s}</div>`:''}</button>`;
+      }).join('')
     : '<p class="hint">Baza produktów jest pusta — dodaj coś poniżej.</p>';
+  $('#fpNutriGrid').innerHTML=enabledNutrients().map(N=>
+    `<input type="number" step="${N.step}" data-fpn="${N.key}" placeholder="${N.label} (${N.unit})">`
+  ).join('');
 }
 $('#foodPopList').addEventListener('click',e=>{
   const b=e.target.closest('[data-fpid]'); if(!b) return;
   const p=state.products.find(x=>x.id===b.dataset.fpid); if(!p) return;
-  addQuickMeal(p.name,p.bialko,p.woda,p.kcal);
+  addQuickMeal(p.name,p);
   $('#foodPop').classList.remove('open');
 });
 $('#fpAddBtn').addEventListener('click',()=>{
   const name=$('#fpName').value.trim();
   if(!name){ toast('Wpisz nazwę posiłku'); return; }
-  const b=parseNum($('#fpB').value), w=parseNum($('#fpW').value), k=parseNum($('#fpK').value);
-  addQuickMeal(name,b,w,k);
+  const vals={};
+  $$('#fpNutriGrid [data-fpn]').forEach(i=>vals[i.dataset.fpn]=parseNum(i.value));
+  addQuickMeal(name,vals);
   if($('#fpSave').checked){
     const ex=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
-    if(ex){ ex.bialko=b; ex.woda=w; ex.kcal=k; }
-    else state.products.push({id:uid(),name,bialko:b,woda:w,kcal:k});
+    if(ex){ for(const N of NUTRIENTS) if(vals[N.key]!==undefined) ex[N.key]=vals[N.key]; }
+    else {
+      const np={id:uid(),name};
+      for(const N of NUTRIENTS) np[N.key]=vals[N.key]??null;
+      state.products.push(np);
+    }
     save();
   }
-  $('#fpName').value=''; $('#fpB').value=''; $('#fpW').value=''; $('#fpK').value='';
+  $('#fpName').value='';
+  $$('#fpNutriGrid [data-fpn]').forEach(i=>i.value='');
   $('#foodPop').classList.remove('open');
 });
 $('#waterPop').addEventListener('click',e=>{
@@ -1701,6 +1790,13 @@ function renderSummary(){
   $('#kKcalT').textContent  = tg.kcal  ? 'cel: '+fmt(tg.kcal,0)  : 'brak celu';
   $('#kBialkoT').textContent= tg.bialko? 'cel: '+fmt(tg.bialko,0): 'brak celu';
   $('#kWodaT').textContent  = tg.woda  ? 'cel: '+fmt(tg.woda,1)  : 'brak celu';
+  // pokazuj tylko włączone składniki
+  const nuts=state.profile.nutrients;
+  $('#kKcal').closest('.kpi').style.display   = nuts.kcal.on  ? '' : 'none';
+  $('#kBialko').closest('.kpi').style.display = nuts.bialko.on? '' : 'none';
+  $('#kWoda').closest('.kpi').style.display   = nuts.woda.on  ? '' : 'none';
+  $('#kBilans').closest('.kpi').style.display = nuts.kcal.on  ? '' : 'none';
+
   const exs=dayExStats(currentDay);
   $('#kSpal').textContent = exs.kcal ? '~'+fmt(exs.kcal,0) : '0';
   $('#kBilans').textContent = fmt(t.kcal-exs.kcal,0);
@@ -1708,20 +1804,19 @@ function renderSummary(){
   $('#kSen').textContent = slMinSum ? fmtDur(slMinSum) : '—';
   $('#kSenT').textContent = tg.sleepH ? 'cel: '+fmt(tg.sleepH,1)+' h' : 'brak celu';
 
-  const defs=[
-    {lab:'Kalorie', v:t.kcal,  g:tg.kcal,  u:'kcal', dec:0},
-    {lab:'Białko',  v:t.bialko,g:tg.bialko,u:'g',    dec:1},
-    {lab:'Woda',    v:t.woda,  g:tg.woda,  u:'l',    dec:2},
-  ];
-  $('#bars').innerHTML=defs.map(d=>{
-    if(!d.g) return '';
-    const pct=Math.round(d.v/d.g*100);
+  $('#bars').innerHTML=enabledNutrients().map(N=>{
+    const g=nuts[N.key].target;
+    if(!g) return '';
+    const v=t[N.key];
+    const pct=Math.round(v/g*100);
     return `<div class="pb">
-      <div class="lab"><span><b>${d.lab}</b> — ${fmt(d.v,d.dec)} / ${fmt(d.g,d.dec)} ${d.u}</span><span>${pct}%</span></div>
+      <div class="lab"><span><b>${N.label}</b> — ${fmt(v,N.dec)} / ${fmt(g,N.dec)} ${N.unit}</span><span>${pct}%</span></div>
       <div class="track"><div class="fill ${barClass(pct)}" style="width:${Math.min(pct,100)}%"></div></div>
     </div>`;
   }).join('');
 
+  const wdBlock=$('#waterDots').parentElement;
+  wdBlock.style.display = nuts.woda.on ? '' : 'none';
   const goalL = tg.woda||3;
   const cups=Math.max(Math.round(goalL/0.25),1);
   const full=Math.min(Math.round((t.woda)/0.25),cups);
@@ -1744,9 +1839,13 @@ function renderSummary(){
 
   const day=state.days[currentDay];
   const issues=[];
-  if(tg.bialko && t.bialko<tg.bialko*0.9) issues.push(`Białko — brakuje ${fmt(tg.bialko-t.bialko,0)} g`);
-  if(tg.woda   && t.woda  <tg.woda*0.9)   issues.push(`Woda — brakuje ${fmt(tg.woda-t.woda,2)} l`);
-  if(tg.kcal   && t.kcal  >tg.kcal*1.1)   issues.push(`Kalorie — przekroczono o ${fmt(t.kcal-tg.kcal,0)} kcal`);
+  for(const N of enabledNutrients()){
+    const g=nuts[N.key].target;
+    if(!g) continue;
+    const v=t[N.key];
+    if(N.dir==='more' && v<g*0.9) issues.push(`${N.label} — brakuje ${fmt(g-v,N.dec)} ${N.unit}`);
+    if(N.dir==='less' && v>g*1.1) issues.push(`${N.label} — przekroczono o ${fmt(v-g,N.dec)} ${N.unit}`);
+  }
   if(!day || !day.exercises.length)        issues.push('Ćwiczenia — brak zapisanej aktywności dziś');
   if(tg.exMin && wMin<tg.exMin)            issues.push(`Ruch — do celu tygodnia (${fmt(tg.exMin,0)} min) brakuje ${fmt(tg.exMin-wMin,0)} min`);
   if(tg.sleepH){
@@ -1778,11 +1877,11 @@ function arrowFor(total,target,kind){
   const bad=(kind==='kcal')?up:!up;
   return ` <span class="arr ${bad?'bad':'good'}">${arrow} ${txt}</span>`;
 }
-function printBarRow(lab,v,g,u,dec){
+function printBarRow(lab,v,g,u,dec,dir){
   if(!g) return '';
   const pct=Math.round(v/g*100);
   let color='#1a9e4b';
-  if(lab==='Kalorie'){ if(pct>110) color='#c0392b'; else if(pct<60) color='#f39c12'; }
+  if(dir==='less'){ if(pct>110) color='#c0392b'; else if(pct<60) color='#f39c12'; }
   else { if(pct<60) color='#c0392b'; else if(pct<90) color='#f39c12'; }
   return `<div class="pbarrow">
     <div class="pbarlab">${lab} — ${fmt(v,dec)}/${fmt(g,dec)} ${u} &nbsp; ${pct}%</div>
@@ -1794,15 +1893,17 @@ $('#printBtn').addEventListener('click',()=>{
   const t=dayTotals(currentDay);
   const tg=state.profile.targets||{};
   const dn=dayNumber(currentDay);
+  const ens=enabledNutrients();
+  const cols=2+ens.length;
   let rows='';
   for(const M of MEALS){
     const es=day.meals.filter(m=>m.type===M.key);
     if(!es.length) continue;
     const hoursLbl=mealHoursLabel(M.key);
-    rows+=`<tr><td colspan="5" class="sec">${M.label}${hoursLbl?` (optymalnie ${hoursLbl})`:''}</td></tr>`;
+    rows+=`<tr><td colspan="${cols}" class="sec">${M.label}${hoursLbl?` (optymalnie ${hoursLbl})`:''}</td></tr>`;
     rows+=es.map(e=>{
       const outside=e.time&&timeOutsideWindow(M.key,e.time);
-      return `<tr><td${outside?' style="color:#c0392b;font-weight:700"':''}>${e.time||''}${outside?' ⚠':''}</td><td>${esc(e.desc||'')}</td><td style="text-align:right">${fmt(parseNum(e.bialko))}</td><td style="text-align:right">${fmt(parseNum(e.woda),2)}</td><td style="text-align:right">${fmt(parseNum(e.kcal),0)}</td></tr>`;
+      return `<tr><td${outside?' style="color:#c0392b;font-weight:700"':''}>${e.time||''}${outside?' ⚠':''}</td><td>${esc(e.desc||'')}</td>${ens.map(N=>`<td style="text-align:right">${fmt(parseNum(e[N.key]),N.dec)}</td>`).join('')}</tr>`;
     }).join('');
   }
   const exs=dayExStats(currentDay);
@@ -1845,18 +1946,16 @@ $('#printBtn').addEventListener('click',()=>{
       <span>Data: <b>${fmtDatePL(currentDay)}</b></span>
     </div>
     <table>
-      <thead><tr><th style="width:60px">Czas</th><th>Posiłek</th><th style="width:70px">Białko (g)</th><th style="width:70px">Woda (l)</th><th style="width:80px">Kalorie (kcal)</th></tr></thead>
+      <thead><tr><th style="width:60px">Czas</th><th>Posiłek</th>${ens.map(N=>`<th style="width:72px">${N.label} (${N.unit})</th>`).join('')}</tr></thead>
       <tbody>
-        ${rows||'<tr><td colspan="5">Brak zapisanych posiłków.</td></tr>'}
-        <tr class="tot"><td colspan="2">Razem:</td><td style="text-align:right">${fmt(t.bialko)}${arrowFor(t.bialko,tg.bialko,'more')}</td><td style="text-align:right">${fmt(t.woda,2)}${arrowFor(t.woda,tg.woda,'more')}</td><td style="text-align:right">${fmt(t.kcal,0)}${arrowFor(t.kcal,tg.kcal,'kcal')}</td></tr>
-        <tr class="tot"><td colspan="2">Dzienne zapotrzebowanie:</td><td style="text-align:right">${fmt(tg.bialko,0)}</td><td style="text-align:right">${fmt(tg.woda,1)}</td><td style="text-align:right">${fmt(tg.kcal,0)}</td></tr>
+        ${rows||`<tr><td colspan="${cols}">Brak zapisanych posiłków.</td></tr>`}
+        <tr class="tot"><td colspan="2">Razem:</td>${ens.map(N=>`<td style="text-align:right">${fmt(t[N.key],N.dec)}${arrowFor(t[N.key],nutrientTarget(N.key),N.dir==='less'?'kcal':'more')}</td>`).join('')}</tr>
+        <tr class="tot"><td colspan="2">Dzienne zapotrzebowanie:</td>${ens.map(N=>`<td style="text-align:right">${fmt(nutrientTarget(N.key),N.dec)}</td>`).join('')}</tr>
       </tbody>
     </table>
     <h2>Realizacja celów dnia</h2>
-    ${printBarRow('Kalorie',t.kcal,tg.kcal,'kcal',0)}
-    ${printBarRow('Białko',t.bialko,tg.bialko,'g',1)}
-    ${printBarRow('Woda',t.woda,tg.woda,'l',2)}
-    <div class="pbarrow"><div class="pbarlab">Woda — wizualnie (1 kubek = 0,25 l)</div>${cupsHtml}</div>
+    ${ens.map(N=>printBarRow(N.label,t[N.key],nutrientTarget(N.key),N.unit,N.dec,N.dir)).join('')}
+    ${state.profile.nutrients.woda.on?`<div class="pbarrow"><div class="pbarlab">Woda — wizualnie (1 kubek = 0,25 l)</div>${cupsHtml}</div>`:''}
     ${exs.kcal?`<div class="foot"><b>🔥 Spalone (ćwiczenia, szacunkowo):</b> ~${fmt(exs.kcal,0)} kcal &nbsp;·&nbsp; <b>Bilans dnia (zjedzone − spalone):</b> ${fmt(t.kcal-exs.kcal,0)} kcal</div>`:''}
     ${weightHtml}
     ${exTableHtml}
@@ -1868,18 +1967,18 @@ $('#printBtn').addEventListener('click',()=>{
 
 /* ================= PRODUKTY ================= */
 function renderProducts(){
+  const ens=enabledNutrients();
+  $('#prodTable thead').innerHTML=`<tr><th>Nazwa produktu / posiłku</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr>`;
   const tb=$('#prodTable tbody'); tb.innerHTML='';
   for(const p of state.products){
     tb.insertAdjacentHTML('beforeend',`
       <tr data-prid="${p.id}">
         <td><input type="text" value="${esc(p.name)}" data-prf="name" placeholder="nazwa..."></td>
-        <td class="num"><input type="number" step="0.1" style="width:90px;text-align:right" value="${p.bialko??''}" data-prf="bialko"></td>
-        <td class="num"><input type="number" step="0.05" style="width:90px;text-align:right" value="${p.woda??''}" data-prf="woda"></td>
-        <td class="num"><input type="number" step="1" style="width:90px;text-align:right" value="${p.kcal??''}" data-prf="kcal"></td>
+        ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" style="width:90px;text-align:right" value="${p[N.key]??''}" data-prf="${N.key}"></td>`).join('')}
         <td><button class="btn danger small" data-prdel="${p.id}">✕</button></td>
       </tr>`);
   }
-  if(!state.products.length) tb.innerHTML='<tr><td colspan="5" class="hint">Baza jest pusta — dodaj pierwszy produkt.</td></tr>';
+  if(!state.products.length) tb.innerHTML=`<tr><td colspan="${ens.length+2}" class="hint">Baza jest pusta — dodaj pierwszy produkt.</td></tr>`;
 }
 $('#addProdBtn').addEventListener('click',()=>{
   state.products.push({id:uid(),name:'',bialko:null,woda:null,kcal:null});
@@ -2193,9 +2292,9 @@ $('#printWeekBtn').addEventListener('click',()=>{
       <tr><td>Woda (l)</td><td style="text-align:right">${fmt(R.avgW,2)}</td><td style="text-align:right">${fmt(tg.woda,1)}</td><td>${arrAvg(R.avgW,tg.woda,'more')}</td></tr>
     </tbody></table>
     ${R.best?`<div class="foot">🏆 Najlepszy dzień: <b>${weekdayPL(R.best.iso)} ${fmtDatePL(R.best.iso)}</b> (${R.best.score}%)${R.worst&&R.worst.iso!==R.best.iso?` &nbsp;·&nbsp; Najsłabszy: <b>${weekdayPL(R.worst.iso)} ${fmtDatePL(R.worst.iso)}</b> (${R.worst.score}%)`:''}</div>`:''}
-    ${printBarRow('Śr. kalorie',R.avgKcal??0,tg.kcal,'kcal',0)}
-    ${printBarRow('Śr. białko',R.avgB??0,tg.bialko,'g',1)}
-    ${printBarRow('Śr. woda',R.avgW??0,tg.woda,'l',2)}
+    ${printBarRow('Śr. kalorie',R.avgKcal??0,tg.kcal,'kcal',0,'less')}
+    ${printBarRow('Śr. białko',R.avgB??0,tg.bialko,'g',1,'more')}
+    ${printBarRow('Śr. woda',R.avgW??0,tg.woda,'l',2,'more')}
   `);
 });
 
@@ -2339,8 +2438,9 @@ function downloadCsv(name,rows){
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
 $('#exportCsvDaysBtn').addEventListener('click',()=>{
+  const ens=enabledNutrients();
   const habitCols=state.habits.map(h=>h.name||'(nawyk)');
-  const rows=[['Data','Dzień tygodnia','Kalorie (kcal)','Białko (g)','Woda (l)','Posiłki','Ruch (min)','Spalone (kcal)','Sen (h)',...habitCols]];
+  const rows=[['Data','Dzień tygodnia',...ens.map(N=>`${N.label} (${N.unit})`),'Posiłki','Ruch (min)','Spalone (kcal)','Sen (h)',...habitCols]];
   const allDates=[...new Set([...Object.keys(state.days),...state.sleep.map(s=>s.endDate)])].filter(Boolean).sort();
   for(const iso of allDates){
     const t=dayTotals(iso);
@@ -2348,7 +2448,8 @@ $('#exportCsvDaysBtn').addEventListener('click',()=>{
     const sl=daySleepMin(iso);
     rows.push([
       fmtDatePL(iso), weekdayPL(iso),
-      csvNum(t.kcal,0), csvNum(t.bialko,1), csvNum(t.woda,2), String(t.posilki),
+      ...ens.map(N=>csvNum(t[N.key],Math.max(N.dec,1))),
+      String(t.posilki),
       es.min?csvNum(es.min,0):'', es.kcal?csvNum(es.kcal,0):'', sl?csvNum(sl/60,2):'',
       ...state.habits.map(h=>habitChecked(iso,h.id)?'TAK':'')
     ]);
@@ -2510,8 +2611,17 @@ function renderMetricChart(){
   });
 }
 
+function refreshIntakeSelector(){
+  const sel=$('#intakeSel');
+  const cur=sel.value;
+  sel.innerHTML=enabledNutrients().map(N=>`<option value="${N.key}">${N.label} (${N.unit})</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
 function renderIntakeChart(){
+  refreshIntakeSelector();
   const what=$('#intakeSel').value;
+  const N=NUTRIENTS.find(x=>x.key===what);
+  if(!N){ if(intakeChart){intakeChart.destroy();intakeChart=null;} return; }
   const labels=[],vals=[];
   const t0=todayStr();
   for(let i=13;i>=0;i--){
@@ -2519,12 +2629,12 @@ function renderIntakeChart(){
     labels.push(iso.slice(8,10)+'.'+iso.slice(5,7));
     vals.push(Math.round(dayTotals(iso)[what]*100)/100);
   }
-  const target={kcal:state.profile.targets.kcal,bialko:state.profile.targets.bialko,woda:state.profile.targets.woda}[what];
+  const target=nutrientTarget(what);
   if(intakeChart) intakeChart.destroy();
   intakeChart=new Chart($('#intakeChart'),{
     type:'bar',
     data:{labels,datasets:[
-      {label:{kcal:'Kalorie (kcal)',bialko:'Białko (g)',woda:'Woda (l)'}[what],data:vals,backgroundColor:'rgba(47,111,176,.7)',borderRadius:6},
+      {label:`${N.label} (${N.unit})`,data:vals,backgroundColor:'rgba(47,111,176,.7)',borderRadius:6},
       ...(target?[{type:'line',label:'Dzienne zapotrzebowanie',data:vals.map(()=>target),borderColor:'#f39c12',borderDash:[7,5],pointRadius:0}]:[])
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
