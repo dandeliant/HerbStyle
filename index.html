@@ -695,7 +695,7 @@
   <section class="tab" id="tab-produkty">
     <div class="card">
       <h2>🍎 Baza produktów i posiłków</h2>
-      <p class="hint">Zapisz raz swoje typowe produkty i posiłki (np. „Szejk Herbalife: 18 g białka, 220 kcal”), a potem dodawaj je w Dzienniku <b>jednym kliknięciem</b> z listy „＋ z bazy produktów”. Możesz też zapisać dowolny wpis z dziennika do bazy przyciskiem ⭐. Wszystko jest edytowalne w każdej chwili.</p>
+      <p class="hint">Zapisz raz swoje typowe produkty i posiłki (np. „Koktajl proteinowy: 18 g białka, 220 kcal”), a potem dodawaj je w Dzienniku <b>jednym kliknięciem</b> z listy „＋ z bazy produktów”. Możesz też zapisać dowolny wpis z dziennika do bazy przyciskiem ⭐. Wszystko jest edytowalne w każdej chwili.</p>
       <div class="tscroll">
         <table id="prodTable">
           <thead><tr><th>Nazwa produktu / posiłku</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Kalorie (kcal)</th><th></th></tr></thead>
@@ -918,7 +918,10 @@ function load(){
   if(!st.profile.targets) st.profile.targets={kcal:2000,bialko:100,woda:3};
   if(!st.measurements) st.measurements=[];
   if(!st.days) st.days={};
-  if(!st.products) st.products=[{id:'seed1',name:'Szejk Herbalife',bialko:18,woda:0.25,kcal:220}];
+  if(!st.products) st.products=[{id:'seed1',name:'Koktajl proteinowy',bialko:18,woda:0.25,kcal:220}];
+  // migracja: przemianuj przykładowy produkt w istniejących danych
+  const _sh=st.products.find(p=>p.name==='Szejk Herbalife');
+  if(_sh) _sh.name='Koktajl proteinowy';
   if(st.profile.targets.exMin===undefined) st.profile.targets.exMin=150;
   if(st.profile.targets.exSessions===undefined) st.profile.targets.exSessions=3;
   if(!st.sleep) st.sleep=[];
