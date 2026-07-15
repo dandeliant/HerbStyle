@@ -206,6 +206,16 @@
   }
   .fab:hover{transform:scale(1.08)}
   .fab:active{transform:scale(.95)}
+  /* speed dial: cztery mini-przyciski zwinięte pod głównym ＋ */
+  .fab.mini{opacity:0;pointer-events:none;transition:transform .28s cubic-bezier(.3,.8,.4,1),opacity .2s}
+  #waterFab{transform:translateY(68px) scale(.3)}
+  #foodFab{transform:translateY(136px) scale(.3)}
+  #exFab{transform:translateY(204px) scale(.3)}
+  #sleepFab{transform:translateY(272px) scale(.3)}
+  body.dialopen .fab.mini{opacity:1;pointer-events:auto;transform:none}
+  body.dialopen .fab.mini:hover{transform:scale(1.08)}
+  #mainFab{z-index:51;transition:transform .28s cubic-bezier(.3,.8,.4,1),box-shadow .18s}
+  body.dialopen #mainFab{transform:rotate(45deg)}
   .fabpop{
     position:fixed;right:18px;bottom:84px;background:var(--card);border:1px solid var(--line);
     border-radius:16px;box-shadow:var(--shadow-md);padding:14px;display:none;z-index:50;
@@ -285,13 +295,14 @@
     .btn.small{padding:8px 12px}
     /* FAB-y i dymki ponad dolną nawigacją */
     .fab{bottom:calc(84px + env(safe-area-inset-bottom))}
-    #foodFab{bottom:calc(152px + env(safe-area-inset-bottom)) !important}
-    #exFab{bottom:calc(220px + env(safe-area-inset-bottom)) !important}
-    #sleepFab{bottom:calc(288px + env(safe-area-inset-bottom)) !important}
-    #waterPop{right:80px !important;bottom:calc(84px + env(safe-area-inset-bottom)) !important}
-    #foodPop{right:80px !important;bottom:calc(152px + env(safe-area-inset-bottom)) !important;width:270px !important}
-    #exPop{right:80px !important;bottom:calc(220px + env(safe-area-inset-bottom)) !important;width:270px !important}
-    #sleepPop{right:80px !important;bottom:calc(288px + env(safe-area-inset-bottom)) !important;width:270px !important}
+    #waterFab{bottom:calc(152px + env(safe-area-inset-bottom)) !important}
+    #foodFab{bottom:calc(220px + env(safe-area-inset-bottom)) !important}
+    #exFab{bottom:calc(288px + env(safe-area-inset-bottom)) !important}
+    #sleepFab{bottom:calc(356px + env(safe-area-inset-bottom)) !important}
+    #waterPop{right:80px !important;bottom:calc(152px + env(safe-area-inset-bottom)) !important}
+    #foodPop{right:80px !important;bottom:calc(220px + env(safe-area-inset-bottom)) !important;width:270px !important}
+    #exPop{right:80px !important;bottom:calc(288px + env(safe-area-inset-bottom)) !important;width:270px !important}
+    #sleepPop{right:80px !important;bottom:calc(356px + env(safe-area-inset-bottom)) !important;width:270px !important}
     .toast{bottom:calc(156px + env(safe-area-inset-bottom))}
     .kpis{grid-template-columns:repeat(2,1fr);gap:8px}
     .kpi .v{font-size:1.2rem}
@@ -708,7 +719,7 @@
   </section>
 
   <!-- FAB: szybka woda -->
-  <div class="fabpop" id="waterPop" style="right:84px;bottom:18px">
+  <div class="fabpop" id="waterPop" style="right:84px;bottom:86px">
     <div class="fptitle">💧 Ile wody wypiłeś?</div>
     <div class="fpgrid">
       <button data-ml="100">100 ml</button>
@@ -720,10 +731,10 @@
       <button data-ml="1000">1000 ml</button>
     </div>
   </div>
-  <div class="fab" id="waterFab" title="Szybkie dodanie wody">💧</div>
+  <div class="fab mini" id="waterFab" title="Szybkie dodanie wody" style="bottom:86px">💧</div>
 
   <!-- FAB: szybkie jedzenie -->
-  <div class="fabpop" id="foodPop" style="right:84px;bottom:86px;width:300px">
+  <div class="fabpop" id="foodPop" style="right:84px;bottom:154px;width:300px">
     <div class="fptitle">🍽️ Szybkie dodanie jedzenia</div>
     <div class="fplist" id="foodPopList"></div>
     <div class="fpform" style="border-top:1px solid var(--line);padding-top:8px">
@@ -733,10 +744,10 @@
       <button class="btn primary small" id="fpAddBtn" style="width:100%">＋ Dodaj do dziennika</button>
     </div>
   </div>
-  <div class="fab" id="foodFab" title="Szybkie dodanie jedzenia" style="bottom:86px;background:var(--accent);box-shadow:0 6px 16px rgba(243,156,18,.45)">🍽️</div>
+  <div class="fab mini" id="foodFab" title="Szybkie dodanie jedzenia" style="bottom:154px;background:var(--accent);box-shadow:0 6px 16px rgba(243,156,18,.45)">🍽️</div>
 
   <!-- FAB: szybki ruch / trening -->
-  <div class="fabpop" id="exPop" style="right:84px;bottom:154px;width:290px">
+  <div class="fabpop" id="exPop" style="right:84px;bottom:222px;width:290px">
     <div class="fptitle">🏋️ Szybki ruch</div>
     <div id="exPopMain" style="margin-bottom:10px"></div>
     <div style="border-top:1px solid var(--line);padding-top:8px">
@@ -753,10 +764,10 @@
       <p class="hint" style="margin:6px 0 0">Aktywność zostanie zapisana jako zakończona teraz.</p>
     </div>
   </div>
-  <div class="fab" id="exFab" title="Szybki ruch / trening" style="bottom:154px;background:linear-gradient(135deg,#e0653d,#c74b2e);box-shadow:0 8px 20px -4px rgba(199,75,46,.55)">🏋️</div>
+  <div class="fab mini" id="exFab" title="Szybki ruch / trening" style="bottom:222px;background:linear-gradient(135deg,#e0653d,#c74b2e);box-shadow:0 8px 20px -4px rgba(199,75,46,.55)">🏋️</div>
 
   <!-- FAB: szybki sen -->
-  <div class="fabpop" id="sleepPop" style="right:84px;bottom:222px;width:290px">
+  <div class="fabpop" id="sleepPop" style="right:84px;bottom:290px;width:290px">
     <div class="fptitle">😴 Szybki sen</div>
     <div id="sleepPopMain" style="margin-bottom:10px"></div>
     <div style="border-top:1px solid var(--line);padding-top:8px">
@@ -768,7 +779,10 @@
       <button class="btn primary small" id="qsAddBtn" style="width:100%">＋ Zapisz sen</button>
     </div>
   </div>
-  <div class="fab" id="sleepFab" title="Szybki sen" style="bottom:222px;background:linear-gradient(135deg,#8a63c9,#6d4bb5);box-shadow:0 8px 20px -4px rgba(109,75,181,.55)">😴</div>
+  <div class="fab mini" id="sleepFab" title="Szybki sen" style="bottom:290px;background:linear-gradient(135deg,#8a63c9,#6d4bb5);box-shadow:0 8px 20px -4px rgba(109,75,181,.55)">😴</div>
+
+  <!-- główny przycisk rozwijający szybkie akcje -->
+  <div class="fab" id="mainFab" title="Szybkie akcje: woda, jedzenie, ruch, sen" style="bottom:18px;background:linear-gradient(135deg,var(--brand),#2ec79b);box-shadow:0 8px 20px -4px var(--brand-glow);font-size:1.8rem;font-weight:300">＋</div>
 
   <div class="toast" id="toast"></div>
 
@@ -1772,12 +1786,43 @@ $('#dayNotes').addEventListener('input',e=>{ getDay(currentDay).notes=e.target.v
 /* ---------- szybkie przyciski (FAB): woda, jedzenie, ruch, sen ---------- */
 const POPS=['waterPop','foodPop','exPop','sleepPop'];
 function closePops(except){ POPS.forEach(id=>{ if(id!==except) $('#'+id).classList.remove('open'); }); }
+function anyPopOpen(){ return POPS.some(id=>$('#'+id).classList.contains('open')); }
+
+/* speed dial — główny ＋ rozwija mini-przyciski */
+let dialOpenedAt=0;
+function openDial(){
+  if(!document.body.classList.contains('dialopen')){
+    document.body.classList.add('dialopen');
+    dialOpenedAt=Date.now();
+  }
+}
+function closeDial(){ document.body.classList.remove('dialopen'); }
+$('#mainFab').addEventListener('click',e=>{
+  e.stopPropagation();
+  if(document.body.classList.contains('dialopen') && Date.now()-dialOpenedAt>350){
+    closePops(); closeDial();
+  } else openDial();
+});
+/* na urządzeniach z myszką: rozwiń po najechaniu, zwiń po opuszczeniu (o ile żaden panel nie jest otwarty) */
+if(window.matchMedia && matchMedia('(hover: hover)').matches){
+  let dialHoverTimer=null;
+  document.addEventListener('pointerover',e=>{
+    if(e.target.closest && e.target.closest('.fab,.fabpop')){
+      clearTimeout(dialHoverTimer);
+      openDial();
+    } else {
+      clearTimeout(dialHoverTimer);
+      dialHoverTimer=setTimeout(()=>{ if(!anyPopOpen()) closeDial(); },400);
+    }
+  });
+}
 $('#waterFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('waterPop'); $('#waterPop').classList.toggle('open'); });
 $('#foodFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('foodPop'); renderFoodPop(); $('#foodPop').classList.toggle('open'); });
 $('#exFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('exPop'); renderExPop(); $('#exPop').classList.toggle('open'); });
 $('#sleepFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('sleepPop'); renderSleepPop(); $('#sleepPop').classList.toggle('open'); });
 document.addEventListener('click',e=>{
   POPS.forEach(id=>{ if(!e.target.closest('#'+id)) $('#'+id).classList.remove('open'); });
+  if(!e.target.closest('.fab') && !e.target.closest('.fabpop')) closeDial();
 });
 
 /* szybki ruch */
