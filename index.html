@@ -47,6 +47,22 @@
   .daybadge{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.28);border-radius:12px;padding:8px 16px;font-size:.82rem;text-align:center;position:relative}
   .daybadge b{font-size:1.15rem;display:block;font-variant-numeric:tabular-nums}
 
+  /* ---------- cofnij / ponów ---------- */
+  .undoWrap{position:relative;align-self:center}
+  .undoToggle{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.14);color:#fff;font-size:1rem;cursor:pointer;transition:background .15s}
+  .undoToggle:hover{background:rgba(255,255,255,.28)}
+  .undoPanel{display:none;position:absolute;right:0;top:46px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-md);padding:10px;z-index:70;min-width:190px}
+  .undoPanel.open{display:flex;flex-direction:column;gap:6px}
+  .btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+
+  /* ---------- zablokowane wpisy posiłków (edycja przez ✏️) ---------- */
+  .meal table input:disabled{
+    background:transparent;border-color:transparent;color:var(--ink);
+    opacity:1;-webkit-text-fill-color:var(--ink);cursor:default;box-shadow:none;
+  }
+  .meal tr.editing td{background:rgba(14,159,120,.06)}
+  .meal tr.editing input:not(:disabled){border-color:var(--brand)}
+
   /* ---------- tabs (desktop: pasek u góry) ---------- */
   nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
   nav.tabs button{
@@ -403,6 +419,14 @@
       <div class="daybadge">Dzień nr<b id="hdrDayNr">—</b></div>
       <div class="daybadge">Tydzień nr<b id="hdrWeekNr">—</b></div>
       <div class="daybadge">Dziś<b id="hdrToday">—</b></div>
+      <div class="undoWrap">
+        <button class="undoToggle" id="undoToggle" title="Cofnij / ponów zmiany">↩️</button>
+        <div class="undoPanel" id="undoPanel">
+          <button class="btn small ghost" id="undoBtn">↩️ Wstecz <span id="undoCnt"></span></button>
+          <button class="btn small ghost" id="redoBtn">↪️ Do przodu <span id="redoCnt"></span></button>
+          <span class="hint" style="text-align:center">Ctrl+Z / Ctrl+Y · maks. 10 kroków</span>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -959,7 +983,53 @@ function load(){
   ensureNutrients(st);
   return st;
 }
-function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+/* ---------- historia zmian: Wstecz / Do przodu (maks. 10 kroków) ---------- */
+const UNDO_MAX=10;
+let undoStack=[], redoStack=[];
+let histPrev=null, histLastPush=0;
+function save(){
+  const json=JSON.stringify(state);
+  const now=Date.now();
+  // szybkie serie zmian (np. wpisywanie litera po literze) trafiają do historii jako jeden krok
+  if(histPrev!==null && json!==histPrev && now-histLastPush>900){
+    undoStack.push(histPrev);
+    if(undoStack.length>UNDO_MAX) undoStack.shift();
+    redoStack.length=0;
+    histLastPush=now;
+    updateUndoUI();
+  }
+  histPrev=json;
+  localStorage.setItem(LS_KEY, json);
+}
+function applySnapshot(json){
+  state=JSON.parse(json);
+  histPrev=json;
+  localStorage.setItem(LS_KEY, json);
+  rerenderAll();
+  updateUndoUI();
+}
+function undo(){
+  if(!undoStack.length){ toast('Nie ma nic do cofnięcia'); return; }
+  redoStack.push(JSON.stringify(state));
+  applySnapshot(undoStack.pop());
+  toast('↩️ Cofnięto');
+}
+function redo(){
+  if(!redoStack.length){ toast('Nie ma nic do przywrócenia'); return; }
+  undoStack.push(JSON.stringify(state));
+  applySnapshot(redoStack.pop());
+  toast('↪️ Przywrócono');
+}
+function rerenderAll(){
+  renderHeader(); renderProfile(); renderDay(); renderMeasurements(); renderPhotoCompare(); renderProducts(); applyNutrientVisibility();
+  if($('#tab-statystyki').classList.contains('active')) renderStats();
+}
+function updateUndoUI(){
+  $('#undoBtn').disabled=!undoStack.length;
+  $('#redoBtn').disabled=!redoStack.length;
+  $('#undoCnt').textContent=undoStack.length?`(${undoStack.length})`:'';
+  $('#redoCnt').textContent=redoStack.length?`(${redoStack.length})`:'';
+}
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 /* ================= INDEXEDDB (zdjęcia) ================= */
@@ -1167,6 +1237,18 @@ function doPrint(html){
     +`<div class="foot" style="margin-top:6mm;text-align:center;color:#555;border-top:1px solid #999;padding-top:2mm">HerbStyle — Dziennik Zdrowych Nawyków · Copyright © ${new Date().getFullYear()} Daniel Ostrowski. Wszelkie prawa zastrzeżone.</div>`;
   window.print();
 }
+
+/* ---------- UI cofania ---------- */
+$('#undoToggle').addEventListener('click',e=>{ e.stopPropagation(); $('#undoPanel').classList.toggle('open'); });
+$('#undoBtn').addEventListener('click',undo);
+$('#redoBtn').addEventListener('click',redo);
+document.addEventListener('click',e=>{ if(!e.target.closest('.undoWrap')) $('#undoPanel').classList.remove('open'); });
+document.addEventListener('keydown',e=>{
+  const t=e.target;
+  if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT')) return; // nie koliduj z cofaniem tekstu w polach
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); }
+  else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); }
+});
 
 /* ================= TABS ================= */
 $$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
@@ -1497,13 +1579,17 @@ function renderDay(){
       </div>
       ${entries.length?`<div class="tscroll"><table>
         <thead><tr><th>Czas</th><th>Co spożyto</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr></thead>
-        <tbody>${entries.map(e=>`
-          <tr data-id="${e.id}">
-            <td><input type="time" value="${e.time||''}" data-fld="time" class="${timeOutsideWindow(M.key,e.time)?'badtime':''}" ${timeOutsideWindow(M.key,e.time)?'title="Poza optymalnym oknem ('+hoursLbl+')"':''}></td>
-            <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc" list="mealHistList"></td>
-            ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" value="${e[N.key]??''}" data-fld="${N.key}"></td>`).join('')}
-            <td style="white-space:nowrap"><button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
-          </tr>`).join('')}
+        <tbody>${entries.map(e=>{
+          const isEdit=editingMeals.has(e.id);
+          const lock=isEdit?'':'disabled';
+          return `
+          <tr data-id="${e.id}" class="${isEdit?'editing':''}">
+            <td><input type="time" value="${e.time||''}" data-fld="time" ${lock} class="${timeOutsideWindow(M.key,e.time)?'badtime':''}" ${timeOutsideWindow(M.key,e.time)?'title="Poza optymalnym oknem ('+hoursLbl+')"':''}></td>
+            <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc" list="mealHistList" ${lock}></td>
+            ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" value="${e[N.key]??''}" data-fld="${N.key}" ${lock}></td>`).join('')}
+            <td style="white-space:nowrap"><button class="btn plain small" data-editm="${e.id}" title="${isEdit?'Zatwierdź zmiany':'Zmień'}">${isEdit?'✅':'✏️'}</button><button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
+          </tr>`;
+        }).join('')}
           <tr class="mealsum">
             <td colspan="2">Σ Razem — ${M.label}</td>
             ${ens.map(N=>`<td class="num" data-msum="${N.key}">${fmt(mt[N.key],N.dec)}</td>`).join('')}
@@ -1608,13 +1694,25 @@ $('#habitsBox').addEventListener('change',e=>{
   save(); renderHabits();
 });
 
+/* wpisy edytowalne dopiero po kliknięciu ✏️ (nowe wiersze od razu otwarte) */
+const editingMeals=new Set();
 /* delegacja zdarzeń dziennika */
 $('#mealsContainer').addEventListener('click',e=>{
   const add=e.target.closest('[data-add]');
   if(add){
     const day=getDay(currentDay);
-    day.meals.push({id:uid(),type:add.dataset.add,time:nowTime(),desc:'',bialko:null,woda:null,kcal:null,createdAt:new Date().toISOString()});
+    const id=uid();
+    day.meals.push({id,type:add.dataset.add,time:nowTime(),desc:'',bialko:null,woda:null,kcal:null,createdAt:new Date().toISOString()});
+    editingMeals.add(id); // świeży wiersz od razu do wypełnienia
     save(); renderDay();
+    return;
+  }
+  const editm=e.target.closest('[data-editm]');
+  if(editm){
+    const id=editm.dataset.editm;
+    if(editingMeals.has(id)) editingMeals.delete(id);
+    else editingMeals.add(id);
+    renderDay();
     return;
   }
   const star=e.target.closest('[data-star]');
@@ -1638,6 +1736,7 @@ $('#mealsContainer').addEventListener('click',e=>{
   if(del){
     const day=getDay(currentDay);
     day.meals=day.meals.filter(m=>m.id!==del.dataset.del);
+    editingMeals.delete(del.dataset.del);
     save(); renderDay();
   }
 });
@@ -3156,6 +3255,8 @@ if(typeof Chart!=='undefined' && window.matchMedia && matchMedia('(prefers-color
 
 /* ================= START ================= */
 $('#copyYear').textContent=new Date().getFullYear();
+histPrev=JSON.stringify(state);
+updateUndoUI();
 applyNutrientVisibility();
 initStatSelectors();
 renderHeader();
