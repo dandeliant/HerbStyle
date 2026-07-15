@@ -541,6 +541,7 @@
         <option value="🧹 Aktywność domowa"></option>
         <option value="✨ Inne"></option>
       </datalist>
+      <datalist id="mealHistList"></datalist>
     </div>
 
     <div class="card">
@@ -739,7 +740,8 @@
     <div class="fptitle">🍽️ Szybkie dodanie jedzenia</div>
     <div class="fplist" id="foodPopList"></div>
     <div class="fpform" style="border-top:1px solid var(--line);padding-top:8px">
-      <input type="text" id="fpName" placeholder="nowy produkt / posiłek...">
+      <input type="text" id="fpName" placeholder="nowy produkt / posiłek... (szukam też w historii)">
+      <div class="fplist" id="fpSuggest" style="display:none;max-height:170px;margin:0 0 6px"></div>
       <div id="fpNutriGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px"></div>
       <label style="font-size:.8rem;display:flex;gap:6px;align-items:center;margin:2px 0 8px;color:var(--muted)"><input type="checkbox" id="fpSave" checked style="width:auto"> zapisz też w bazie produktów</label>
       <button class="btn primary small" id="fpAddBtn" style="width:100%">＋ Dodaj do dziennika</button>
@@ -1420,6 +1422,32 @@ $('#nextDay').addEventListener('click',()=>shiftDay(1));
 $('#todayBtn').addEventListener('click',()=>{ currentDay=todayStr(); renderDay(); });
 function shiftDay(n){ currentDay=isoAddDays(currentDay,n); renderDay(); }
 
+/* historia posiłków ze wszystkich dni — do podpowiedzi przy wpisywaniu */
+function mealHistory(){
+  const map=new Map();
+  for(const iso of Object.keys(state.days)){
+    const d=state.days[iso];
+    if(!d||!d.meals) continue;
+    for(const m of d.meals){
+      const name=(m.desc||'').trim();
+      if(!name || /^Woda \d+ ml$/i.test(name)) continue; // pomiń automatyczne wpisy wody
+      const k=name.toLowerCase();
+      const prev=map.get(k);
+      if(!prev){
+        const rec={name,count:1,lastDate:iso,vals:{}};
+        for(const N of NUTRIENTS) rec.vals[N.key]=parseNum(m[N.key]);
+        map.set(k,rec);
+      } else {
+        prev.count++;
+        if(iso>=prev.lastDate){
+          prev.lastDate=iso; prev.name=name;
+          for(const N of NUTRIENTS){ const v=parseNum(m[N.key]); if(v!=null) prev.vals[N.key]=v; }
+        }
+      }
+    }
+  }
+  return [...map.values()].sort((a,b)=> b.count-a.count || b.lastDate.localeCompare(a.lastDate));
+}
 function productSummary(p){
   const parts=enabledNutrients().filter(N=>p[N.key]!=null).slice(0,3)
     .map(N=>`${fmt(p[N.key],N.dec)} ${N.unit==='kcal'?'kcal':N.unit+' '+N.label.toLowerCase()}`);
@@ -1466,7 +1494,7 @@ function renderDay(){
         <tbody>${entries.map(e=>`
           <tr data-id="${e.id}">
             <td><input type="time" value="${e.time||''}" data-fld="time" class="${timeOutsideWindow(M.key,e.time)?'badtime':''}" ${timeOutsideWindow(M.key,e.time)?'title="Poza optymalnym oknem ('+hoursLbl+')"':''}></td>
-            <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc"></td>
+            <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc" list="mealHistList"></td>
             ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" value="${e[N.key]??''}" data-fld="${N.key}"></td>`).join('')}
             <td style="white-space:nowrap"><button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
           </tr>`).join('')}
@@ -1533,6 +1561,9 @@ function renderDay(){
   if(stq.cur>0){ pill.style.display=''; pill.textContent=`🔥 passa: ${stq.cur} ${stq.cur===1?'dzień':'dni'} z ruchem (rekord: ${stq.best})`; }
   else pill.style.display='none';
   renderStartStop();
+
+  // podpowiedzi nazw posiłków z całej historii dziennika
+  $('#mealHistList').innerHTML=mealHistory().slice(0,200).map(h=>`<option value="${esc(h.name)}"></option>`).join('');
 
   $('#dayNotes').value=day.notes||'';
   renderHabits();
@@ -1627,6 +1658,23 @@ $('#mealsContainer').addEventListener('input',e=>{
     const outside=timeOutsideWindow(m.type,m.time);
     e.target.classList.toggle('badtime',outside);
     e.target.title=outside?'Poza optymalnym oknem ('+mealHoursLabel(m.type)+')':'';
+  }
+  if(f==='desc' && m.desc && m.desc.trim().length>1){
+    // pełne trafienie w historyczną nazwę + puste wartości → uzupełnij z historii
+    const h=mealHistory().find(x=>x.name.toLowerCase()===m.desc.trim().toLowerCase());
+    if(h){
+      const ens2=enabledNutrients();
+      const allEmpty=ens2.every(N=>m[N.key]==null||m[N.key]==='');
+      const hasVals=ens2.some(N=>h.vals[N.key]!=null);
+      if(allEmpty&&hasVals){
+        for(const N of NUTRIENTS) if(h.vals[N.key]!=null) m[N.key]=h.vals[N.key];
+        ens2.forEach(N=>{
+          const inp=tr.querySelector(`[data-fld="${N.key}"]`);
+          if(inp&&m[N.key]!=null) inp.value=m[N.key];
+        });
+        toast('✨ Uzupełniono wartości z historii');
+      }
+    }
   }
   save(); refreshMealTotals(); renderSummary();
 });
@@ -1905,12 +1953,34 @@ function renderFoodPop(){
   $('#fpNutriGrid').innerHTML=enabledNutrients().map(N=>
     `<input type="number" step="${N.step}" data-fpn="${N.key}" placeholder="${N.label} (${N.unit})">`
   ).join('');
+  hideFpSuggest();
 }
 $('#foodPopList').addEventListener('click',e=>{
   const b=e.target.closest('[data-fpid]'); if(!b) return;
   const p=state.products.find(x=>x.id===b.dataset.fpid); if(!p) return;
   addQuickMeal(p.name,p);
   $('#foodPop').classList.remove('open');
+});
+/* podpowiedzi z historii w szybkim jedzeniu */
+function hideFpSuggest(){ const b=$('#fpSuggest'); b.style.display='none'; b.innerHTML=''; }
+$('#fpName').addEventListener('input',()=>{
+  const q=$('#fpName').value.trim().toLowerCase();
+  const box=$('#fpSuggest');
+  if(q.length<2){ hideFpSuggest(); return; }
+  const hits=mealHistory().filter(h=>h.name.toLowerCase().includes(q)).slice(0,6);
+  if(!hits.length){ hideFpSuggest(); return; }
+  box.style.display='';
+  box.innerHTML='<div class="fptitle" style="text-align:left;margin-bottom:4px">📖 Z historii dziennika:</div>'+hits.map(h=>{
+    const sub=enabledNutrients().filter(N=>h.vals[N.key]!=null).slice(0,3).map(N=>`${fmt(h.vals[N.key],N.dec)} ${N.unit}`).join(' · ');
+    return `<button data-fph="${esc(h.name)}">${esc(h.name)}<div class="sub">${sub?sub+' · ':''}×${h.count}, ostatnio ${fmtDatePL(h.lastDate)}</div></button>`;
+  }).join('');
+});
+$('#fpSuggest').addEventListener('click',e=>{
+  const b=e.target.closest('[data-fph]'); if(!b) return;
+  const h=mealHistory().find(x=>x.name===b.dataset.fph); if(!h) return;
+  $('#fpName').value=h.name;
+  $$('#fpNutriGrid [data-fpn]').forEach(i=>{ const v=h.vals[i.dataset.fpn]; i.value=v!=null?v:''; });
+  hideFpSuggest();
 });
 $('#fpAddBtn').addEventListener('click',()=>{
   const name=$('#fpName').value.trim();
@@ -1930,6 +2000,7 @@ $('#fpAddBtn').addEventListener('click',()=>{
   }
   $('#fpName').value='';
   $$('#fpNutriGrid [data-fpn]').forEach(i=>i.value='');
+  hideFpSuggest();
   $('#foodPop').classList.remove('open');
 });
 $('#waterPop').addEventListener('click',e=>{
