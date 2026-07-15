@@ -47,12 +47,18 @@
   .daybadge{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.28);border-radius:12px;padding:8px 16px;font-size:.82rem;text-align:center;position:relative}
   .daybadge b{font-size:1.15rem;display:block;font-variant-numeric:tabular-nums}
 
-  /* ---------- cofnij / ponów ---------- */
-  .undoWrap{position:relative;align-self:center}
-  .undoToggle{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.14);color:#fff;font-size:1rem;cursor:pointer;transition:background .15s}
-  .undoToggle:hover{background:rgba(255,255,255,.28)}
-  .undoPanel{display:none;position:absolute;right:0;top:46px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-md);padding:10px;z-index:70;min-width:190px}
-  .undoPanel.open{display:flex;flex-direction:column;gap:6px}
+  /* ---------- pływające cofnij / ponów (zawsze u góry) ---------- */
+  .undoFloat{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:80;display:flex;gap:8px}
+  .undoFloat button{
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:24px;padding:8px 13px;font-size:1.05rem;cursor:pointer;
+    box-shadow:var(--shadow-md);font-family:inherit;font-weight:700;
+    display:flex;align-items:center;gap:5px;transition:transform .15s,opacity .15s,box-shadow .15s;
+  }
+  .undoFloat button:hover:not(:disabled){transform:scale(1.06)}
+  .undoFloat button:active:not(:disabled){transform:scale(.95)}
+  .undoFloat button:disabled{opacity:.35;cursor:default}
+  .undoFloat .cnt{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
   .btn:disabled{opacity:.35;cursor:default;pointer-events:none}
 
   /* ---------- zablokowane wpisy posiłków (edycja przez ✏️) ---------- */
@@ -419,14 +425,6 @@
       <div class="daybadge">Dzień nr<b id="hdrDayNr">—</b></div>
       <div class="daybadge">Tydzień nr<b id="hdrWeekNr">—</b></div>
       <div class="daybadge">Dziś<b id="hdrToday">—</b></div>
-      <div class="undoWrap">
-        <button class="undoToggle" id="undoToggle" title="Cofnij / ponów zmiany">↩️</button>
-        <div class="undoPanel" id="undoPanel">
-          <button class="btn small ghost" id="undoBtn">↩️ Wstecz <span id="undoCnt"></span></button>
-          <button class="btn small ghost" id="redoBtn">↪️ Do przodu <span id="redoCnt"></span></button>
-          <span class="hint" style="text-align:center">Ctrl+Z / Ctrl+Y · maks. 10 kroków</span>
-        </div>
-      </div>
     </div>
   </header>
 
@@ -811,6 +809,12 @@
 
   <!-- główny przycisk rozwijający szybkie akcje -->
   <div class="fab" id="mainFab" title="Szybkie akcje: woda, jedzenie, ruch, sen" style="bottom:18px;background:linear-gradient(135deg,var(--brand),#2ec79b);box-shadow:0 8px 20px -4px var(--brand-glow);font-size:1.8rem;font-weight:300">＋</div>
+
+  <!-- pływające Wstecz / Do przodu — zawsze widoczne u góry -->
+  <div class="undoFloat">
+    <button id="undoBtn" title="Wstecz (Ctrl+Z) — maks. 10 kroków" disabled>↩️<span class="cnt" id="undoCnt"></span></button>
+    <button id="redoBtn" title="Do przodu (Ctrl+Y)" disabled>↪️<span class="cnt" id="redoCnt"></span></button>
+  </div>
 
   <div class="toast" id="toast"></div>
 
@@ -1239,10 +1243,8 @@ function doPrint(html){
 }
 
 /* ---------- UI cofania ---------- */
-$('#undoToggle').addEventListener('click',e=>{ e.stopPropagation(); $('#undoPanel').classList.toggle('open'); });
 $('#undoBtn').addEventListener('click',undo);
 $('#redoBtn').addEventListener('click',redo);
-document.addEventListener('click',e=>{ if(!e.target.closest('.undoWrap')) $('#undoPanel').classList.remove('open'); });
 document.addEventListener('keydown',e=>{
   const t=e.target;
   if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT')) return; // nie koliduj z cofaniem tekstu w polach
