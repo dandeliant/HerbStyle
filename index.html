@@ -1766,12 +1766,73 @@ function renderStartStop(){
 }
 $('#dayNotes').addEventListener('input',e=>{ getDay(currentDay).notes=e.target.value; save(); });
 
-/* ---------- szybka woda + szybkie jedzenie (FAB) ---------- */
-$('#waterFab').addEventListener('click',e=>{ e.stopPropagation(); $('#foodPop').classList.remove('open'); $('#waterPop').classList.toggle('open'); });
-$('#foodFab').addEventListener('click',e=>{ e.stopPropagation(); $('#waterPop').classList.remove('open'); renderFoodPop(); $('#foodPop').classList.toggle('open'); });
+/* ---------- szybkie przyciski (FAB): woda, jedzenie, ruch, sen ---------- */
+const POPS=['waterPop','foodPop','exPop','sleepPop'];
+function closePops(except){ POPS.forEach(id=>{ if(id!==except) $('#'+id).classList.remove('open'); }); }
+$('#waterFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('waterPop'); $('#waterPop').classList.toggle('open'); });
+$('#foodFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('foodPop'); renderFoodPop(); $('#foodPop').classList.toggle('open'); });
+$('#exFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('exPop'); renderExPop(); $('#exPop').classList.toggle('open'); });
+$('#sleepFab').addEventListener('click',e=>{ e.stopPropagation(); closePops('sleepPop'); renderSleepPop(); $('#sleepPop').classList.toggle('open'); });
 document.addEventListener('click',e=>{
-  if(!e.target.closest('#waterPop')) $('#waterPop').classList.remove('open');
-  if(!e.target.closest('#foodPop'))  $('#foodPop').classList.remove('open');
+  POPS.forEach(id=>{ if(!e.target.closest('#'+id)) $('#'+id).classList.remove('open'); });
+});
+
+/* szybki ruch */
+function renderExPop(){
+  const live=findLiveExercise();
+  $('#exPopMain').innerHTML=live
+    ? `<button class="btn primary small" data-expoptoggle style="width:100%">⏹ Zakończ trening (start ${live.ex.time||'?'})</button>`
+    : `<button class="btn orange small" data-expoptoggle style="width:100%">▶ Rozpocznij trening teraz</button>`;
+}
+$('#exPop').addEventListener('click',e=>{
+  if(e.target.closest('[data-expoptoggle]')){
+    toggleExercise();
+    closePops();
+    return;
+  }
+  const b=e.target.closest('[data-qemin]');
+  if(!b) return;
+  const min=Number(b.dataset.qemin);
+  const now=new Date();
+  const start=new Date(now.getTime()-min*60000);
+  const fmtT=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  const iso=todayStr();
+  const ex={id:uid(),date:iso,time:fmtT(start),timeEnd:fmtT(now),durMin:min,cat:$('#qeCat').value.trim(),intens:'',desc:''};
+  getDay(iso).exercises.push(ex);
+  save();
+  $('#qeCat').value='';
+  closePops();
+  if(currentDay===iso) renderDay(); else { renderSummary(); }
+  const k=exKcal(ex);
+  toast(`🏋️ +${min} min ruchu${k?` (~${fmt(k,0)} kcal)`:''} 💪`);
+});
+
+/* szybki sen */
+function renderSleepPop(){
+  const live=findLiveSleep();
+  $('#sleepPopMain').innerHTML=live
+    ? `<button class="btn primary small" data-sleeppoptoggle style="width:100%">☀️ Pobudka (śpisz od ${live.start||'?'})</button>`
+    : `<button class="btn orange small" data-sleeppoptoggle style="width:100%">🌙 Zasypiam teraz</button>`;
+}
+$('#sleepPop').addEventListener('click',e=>{
+  if(e.target.closest('[data-sleeppoptoggle]')){
+    toggleSleep();
+    closePops();
+  }
+});
+$('#qsAddBtn').addEventListener('click',()=>{
+  const st=$('#qsStart').value, en=$('#qsEnd').value;
+  if(!st||!en){ toast('Podaj godziny zaśnięcia i pobudki'); return; }
+  const today=todayStr();
+  const sh=timeToHours(st), eh=timeToHours(en);
+  const startDate=(sh>=eh)?isoAddDays(today,-1):today; // 23:00→7:00 = od wczoraj; 1:30→7:00 = dziś
+  const s={id:uid(),startDate,start:st,endDate:today,end:en};
+  state.sleep.push(s);
+  save();
+  closePops();
+  currentDay=today;
+  renderDay();
+  toast(`😴 Zapisano sen: ${fmtDur(sleepDurMin(s))}`);
 });
 function addQuickMeal(name,vals){
   const iso=todayStr();
