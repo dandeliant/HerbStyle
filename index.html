@@ -1443,6 +1443,11 @@ function mealHistory(){
         if(iso>=prev.lastDate){
           prev.lastDate=iso; prev.name=name;
           for(const N of NUTRIENTS){ const v=parseNum(m[N.key]); if(v!=null) prev.vals[N.key]=v; }
+        } else {
+          // starsze wpisy uzupełniają brakujące wartości (niezależnie od kolejności iteracji)
+          for(const N of NUTRIENTS){
+            if(prev.vals[N.key]==null){ const v=parseNum(m[N.key]); if(v!=null) prev.vals[N.key]=v; }
+          }
         }
       }
     }
@@ -1637,6 +1642,17 @@ $('#mealsContainer').addEventListener('click',e=>{
   }
 });
 $('#mealsContainer').addEventListener('change',e=>{
+  // wybór podpowiedzi z historii potrafi wyzwolić tylko 'change' (np. mobilne przeglądarki)
+  if(e.target.dataset&&e.target.dataset.fld==='desc'){
+    const tr=e.target.closest('tr[data-id]');
+    const day=getDay(currentDay);
+    const m=tr&&day.meals.find(x=>x.id===tr.dataset.id);
+    if(m){
+      m.desc=e.target.value;
+      if(autofillFromHistory(m,tr)){ save(); refreshMealTotals(); renderSummary(); }
+    }
+    return;
+  }
   const sel=e.target.closest('[data-prodsel]');
   if(!sel || !sel.value) return;
   const p=state.products.find(x=>x.id===sel.value);
@@ -1660,25 +1676,34 @@ $('#mealsContainer').addEventListener('input',e=>{
     e.target.classList.toggle('badtime',outside);
     e.target.title=outside?'Poza optymalnym oknem ('+mealHoursLabel(m.type)+')':'';
   }
-  if(f==='desc' && m.desc && m.desc.trim().length>1){
-    // pełne trafienie w historyczną nazwę + puste wartości → uzupełnij z historii
-    const h=mealHistory().find(x=>x.name.toLowerCase()===m.desc.trim().toLowerCase());
-    if(h){
-      const ens2=enabledNutrients();
-      const allEmpty=ens2.every(N=>m[N.key]==null||m[N.key]==='');
-      const hasVals=ens2.some(N=>h.vals[N.key]!=null);
-      if(allEmpty&&hasVals){
-        for(const N of NUTRIENTS) if(h.vals[N.key]!=null) m[N.key]=h.vals[N.key];
-        ens2.forEach(N=>{
-          const inp=tr.querySelector(`[data-fld="${N.key}"]`);
-          if(inp&&m[N.key]!=null) inp.value=m[N.key];
-        });
-        toast('✨ Uzupełniono wartości z historii');
-      }
-    }
-  }
+  if(f==='desc') autofillFromHistory(m,tr);
   save(); refreshMealTotals(); renderSummary();
 });
+/* pełne trafienie w nazwę z historii lub bazy → wypełnij PUSTE pola wartości (nic nie nadpisuje) */
+function autofillFromHistory(m,tr){
+  if(!m.desc || m.desc.trim().length<2) return 0;
+  const q=m.desc.trim().toLowerCase();
+  let vals=null;
+  const h=mealHistory().find(x=>x.name.toLowerCase()===q);
+  if(h) vals=h.vals;
+  if(!vals || !NUTRIENTS.some(N=>vals[N.key]!=null)){
+    const p=state.products.find(x=>(x.name||'').trim().toLowerCase()===q);
+    if(p){ vals={}; for(const N of NUTRIENTS) vals[N.key]=parseNum(p[N.key]); }
+  }
+  if(!vals) return 0;
+  let filled=0;
+  for(const N of NUTRIENTS){
+    const empty=(m[N.key]==null||m[N.key]==='');
+    if(empty && vals[N.key]!=null){
+      m[N.key]=vals[N.key];
+      filled++;
+      const inp=tr&&tr.querySelector(`[data-fld="${N.key}"]`);
+      if(inp) inp.value=m[N.key];
+    }
+  }
+  if(filled) toast('✨ Uzupełniono wartości z historii');
+  return filled;
+}
 function refreshMealTotals(){
   const day=getDay(currentDay);
   const ens=enabledNutrients();
@@ -1988,6 +2013,11 @@ $('#fpAddBtn').addEventListener('click',()=>{
   if(!name){ toast('Wpisz nazwę posiłku'); return; }
   const vals={};
   $$('#fpNutriGrid [data-fpn]').forEach(i=>vals[i.dataset.fpn]=parseNum(i.value));
+  // puste pola + nazwa zgodna z historią → wartości uzupełniają się same
+  if(Object.values(vals).every(v=>v==null)){
+    const h=mealHistory().find(x=>x.name.toLowerCase()===name.toLowerCase());
+    if(h) for(const N of NUTRIENTS) if(h.vals[N.key]!=null) vals[N.key]=h.vals[N.key];
+  }
   addQuickMeal(name,vals);
   if($('#fpSave').checked){
     const ex=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
