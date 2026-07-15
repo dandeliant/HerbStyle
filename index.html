@@ -288,8 +288,8 @@
     #foodFab{bottom:calc(152px + env(safe-area-inset-bottom)) !important}
     #exFab{bottom:calc(220px + env(safe-area-inset-bottom)) !important}
     #sleepFab{bottom:calc(288px + env(safe-area-inset-bottom)) !important}
-    .fabpop{bottom:calc(152px + env(safe-area-inset-bottom))}
-    #foodPop{bottom:calc(220px + env(safe-area-inset-bottom)) !important}
+    #waterPop{right:80px !important;bottom:calc(84px + env(safe-area-inset-bottom)) !important}
+    #foodPop{right:80px !important;bottom:calc(152px + env(safe-area-inset-bottom)) !important;width:270px !important}
     #exPop{right:80px !important;bottom:calc(220px + env(safe-area-inset-bottom)) !important;width:270px !important}
     #sleepPop{right:80px !important;bottom:calc(288px + env(safe-area-inset-bottom)) !important;width:270px !important}
     .toast{bottom:calc(156px + env(safe-area-inset-bottom))}
@@ -708,7 +708,7 @@
   </section>
 
   <!-- FAB: szybka woda -->
-  <div class="fabpop" id="waterPop">
+  <div class="fabpop" id="waterPop" style="right:84px;bottom:18px">
     <div class="fptitle">💧 Ile wody wypiłeś?</div>
     <div class="fpgrid">
       <button data-ml="100">100 ml</button>
@@ -723,7 +723,7 @@
   <div class="fab" id="waterFab" title="Szybkie dodanie wody">💧</div>
 
   <!-- FAB: szybkie jedzenie -->
-  <div class="fabpop" id="foodPop" style="bottom:152px;width:300px">
+  <div class="fabpop" id="foodPop" style="right:84px;bottom:86px;width:300px">
     <div class="fptitle">🍽️ Szybkie dodanie jedzenia</div>
     <div class="fplist" id="foodPopList"></div>
     <div class="fpform" style="border-top:1px solid var(--line);padding-top:8px">
