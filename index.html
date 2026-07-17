@@ -1516,6 +1516,87 @@ $('#nextDay').addEventListener('click',()=>shiftDay(1));
 $('#todayBtn').addEventListener('click',()=>{ currentDay=todayStr(); renderDay(); });
 function shiftDay(n){ currentDay=isoAddDays(currentDay,n); renderDay(); }
 
+/* ---------- dialog: aktualizacja / dodanie produktu do bazy ---------- */
+function productDialog(text,buttons){
+  return new Promise(res=>{
+    const dlg=$('#prodSyncDialog');
+    $('#psText').innerHTML=text;
+    $('#psBtns').innerHTML=buttons.map(b=>`<button class="btn ${b.cls||'ghost'}" data-psv="${b.value}" style="width:100%">${b.label}</button>`).join('');
+    const h=e=>{
+      const btn=e.target.closest('[data-psv]');
+      if(!btn) return;
+      $('#psBtns').removeEventListener('click',h);
+      dlg.close();
+      res(btn.dataset.psv);
+    };
+    $('#psBtns').addEventListener('click',h);
+    dlg.addEventListener('cancel',()=>res('no'),{once:true}); // Escape = nic nie rób
+    dlg.showModal();
+  });
+}
+function productValsFromEntry(m){
+  const v={};
+  for(const N of NUTRIENTS) v[N.key]=parseNum(m[N.key]);
+  return v;
+}
+function valsDiffer(p,vals){
+  return NUTRIENTS.some(N=>{
+    const a=parseNum(p[N.key]);
+    return (a??null)!==(vals[N.key]??null);
+  });
+}
+function uniqueProductName(base){
+  let n=base,i=2;
+  while(state.products.some(p=>(p.name||'').trim().toLowerCase()===n.toLowerCase())) n=`${base} (${i++})`;
+  return n;
+}
+/* Po edycji/zapisie wpisu pyta, co zrobić z bazą produktów.
+   askWhenNew=false → nowe produkty dodawane bez pytania (jawna intencja: ⭐ / checkbox). */
+async function offerProductSync(m,{askWhenNew=true,source=''}={}){
+  const name=(m.desc||'').trim();
+  if(!name || /^Woda \d+ ml$/i.test(name)) return;
+  const vals=productValsFromEntry(m);
+  if(!NUTRIENTS.some(N=>vals[N.key]!=null)) return; // brak wartości — nie ma czego zapisywać
+  const ex=state.products.find(p=>(p.name||'').trim().toLowerCase()===name.toLowerCase());
+  const addNew=(nm)=>{
+    const np={id:uid(),name:nm};
+    for(const N of NUTRIENTS) np[N.key]=vals[N.key];
+    state.products.push(np);
+    save(); renderProducts();
+    toast('＋ Dodano do bazy: '+nm);
+  };
+  if(ex){
+    if(!valsDiffer(ex,vals)){
+      if(source==='star') toast('⭐ Produkt w bazie jest już aktualny');
+      return;
+    }
+    const sub=enabledNutrients().filter(N=>vals[N.key]!=null).map(N=>`${fmt(vals[N.key],N.dec)} ${N.unit}`).join(' · ');
+    const choice=await productDialog(
+      `Wartości „<b>${esc(name)}</b>” różnią się od produktu zapisanego w bazie.<br><span class="hint">Nowe wartości: ${sub}</span>`,
+      [
+        {label:'🔄 Zaktualizuj produkt w bazie',value:'update',cls:'primary'},
+        {label:'＋ Dodaj jako nowy produkt',value:'new',cls:'orange'},
+        {label:'Nie zmieniaj bazy',value:'no'}
+      ]);
+    if(choice==='update'){
+      for(const N of NUTRIENTS) ex[N.key]=vals[N.key];
+      save(); renderProducts();
+      toast('🔄 Zaktualizowano w bazie: '+ex.name);
+    } else if(choice==='new'){
+      addNew(uniqueProductName(name));
+    }
+  } else {
+    if(!askWhenNew){ addNew(name); return; }
+    const choice=await productDialog(
+      `„<b>${esc(name)}</b>” nie ma jeszcze w bazie produktów. Zapisać, aby dodawać jednym kliknięciem?`,
+      [
+        {label:'＋ Dodaj do bazy',value:'new',cls:'primary'},
+        {label:'Nie dodawaj',value:'no'}
+      ]);
+    if(choice==='new') addNew(name);
+  }
+}
+
 /* historia posiłków ze wszystkich dni — do podpowiedzi przy wpisywaniu */
 function mealHistory(){
   const map=new Map();
@@ -1721,8 +1802,14 @@ $('#mealsContainer').addEventListener('click',e=>{
   const editm=e.target.closest('[data-editm]');
   if(editm){
     const id=editm.dataset.editm;
-    if(editingMeals.has(id)) editingMeals.delete(id);
-    else editingMeals.add(id);
+    if(editingMeals.has(id)){
+      // ✅ zatwierdzenie edycji → zapytaj, co zrobić z bazą produktów
+      editingMeals.delete(id);
+      const m=getDay(currentDay).meals.find(x=>x.id===id);
+      if(m) offerProductSync(m,{askWhenNew:true,source:'confirm'});
+    } else {
+      editingMeals.add(id);
+    }
     renderDay();
     return;
   }
@@ -1731,16 +1818,8 @@ $('#mealsContainer').addEventListener('click',e=>{
     const day=getDay(currentDay);
     const m=day.meals.find(x=>x.id===star.dataset.star);
     if(!m || !m.desc || !m.desc.trim()){ toast('Wpisz najpierw nazwę posiłku'); return; }
-    const name=m.desc.trim();
-    const ex=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
-    if(ex){ for(const N of NUTRIENTS) ex[N.key]=parseNum(m[N.key]); toast('⭐ Zaktualizowano w bazie: '+name); }
-    else {
-      const np={id:uid(),name};
-      for(const N of NUTRIENTS) np[N.key]=parseNum(m[N.key]);
-      state.products.push(np);
-      toast('⭐ Zapisano w bazie: '+name);
-    }
-    save(); renderDay();
+    // ⭐ = jawna chęć zapisu: nowy dodaje się od razu, przy istniejącym (z innymi wartościami) pyta
+    offerProductSync(m,{askWhenNew:false,source:'star'}).then(()=>renderDay());
     return;
   }
   const del=e.target.closest('[data-del]');
@@ -2130,14 +2209,9 @@ $('#fpAddBtn').addEventListener('click',()=>{
   }
   addQuickMeal(name,vals);
   if($('#fpSave').checked){
-    const ex=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
-    if(ex){ for(const N of NUTRIENTS) if(vals[N.key]!==undefined) ex[N.key]=vals[N.key]; }
-    else {
-      const np={id:uid(),name};
-      for(const N of NUTRIENTS) np[N.key]=vals[N.key]??null;
-      state.products.push(np);
-    }
-    save();
+    const pm={desc:name};
+    for(const N of NUTRIENTS) pm[N.key]=vals[N.key];
+    offerProductSync(pm,{askWhenNew:false,source:'fab'});
   }
   $('#fpName').value='';
   $$('#fpNutriGrid [data-fpn]').forEach(i=>i.value='');
