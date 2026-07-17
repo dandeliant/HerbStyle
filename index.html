@@ -1700,17 +1700,19 @@ function renderDay(){
   const exTb=$('#exTable tbody'); exTb.innerHTML='';
   for(const ex of day.exercises){
     const k=exKcal(ex);
+    const isEditEx=editingExercises.has(ex.id)||!!ex.live;
+    const lockEx=isEditEx?'':'disabled';
     exTb.insertAdjacentHTML('beforeend',`
-      <tr data-exid="${ex.id}">
-        <td><input type="date" value="${ex.date||currentDay}" data-exfld="date" style="width:140px"></td>
-        <td><input type="time" value="${ex.time||''}" data-exfld="time" style="width:96px"></td>
-        <td><input type="time" value="${ex.timeEnd||''}" data-exfld="timeEnd" style="width:96px"></td>
-        <td class="num"><input type="number" min="0" step="1" value="${ex.durMin??''}" data-exfld="durMin" style="width:72px;text-align:right"></td>
-        <td><input type="text" list="exCatList" value="${esc(ex.cat||'')}" placeholder="wybierz lub wpisz..." data-exfld="cat" style="min-width:150px"></td>
-        <td><select data-exfld="intens" style="width:60px">${['','1','2','3','4','5'].map(v=>`<option value="${v}" ${String(ex.intens??'')===v?'selected':''}>${v||'–'}</option>`).join('')}</select></td>
-        <td><input type="text" value="${esc(ex.desc||'')}" placeholder="opis..." data-exfld="desc" style="min-width:140px"></td>
+      <tr data-exid="${ex.id}" class="${isEditEx?'editing':''}">
+        <td><input type="date" value="${ex.date||currentDay}" data-exfld="date" style="width:140px" ${lockEx}></td>
+        <td><input type="time" value="${ex.time||''}" data-exfld="time" style="width:96px" ${lockEx}></td>
+        <td><input type="time" value="${ex.timeEnd||''}" data-exfld="timeEnd" style="width:96px" ${lockEx}></td>
+        <td class="num"><input type="number" min="0" step="1" value="${ex.durMin??''}" data-exfld="durMin" style="width:72px;text-align:right" ${lockEx}></td>
+        <td><input type="text" list="exCatList" value="${esc(ex.cat||'')}" placeholder="wybierz lub wpisz..." data-exfld="cat" style="min-width:150px" ${lockEx}></td>
+        <td><select data-exfld="intens" style="width:60px" ${lockEx}>${['','1','2','3','4','5'].map(v=>`<option value="${v}" ${String(ex.intens??'')===v?'selected':''}>${v||'–'}</option>`).join('')}</select></td>
+        <td><input type="text" value="${esc(ex.desc||'')}" placeholder="opis..." data-exfld="desc" style="min-width:140px" ${lockEx}></td>
         <td class="num"><span class="exkcal">${k!=null?'~'+fmt(k,0):''}</span>${ex.live?' <span class="pill" style="background:#fdecea;color:var(--bad)">● trwa</span>':''}</td>
-        <td><button class="btn danger small" data-exdel="${ex.id}">✕</button></td>
+        <td style="white-space:nowrap"><button class="btn plain small" data-exeditm="${ex.id}" title="${isEditEx?'Zatwierdź zmiany':'Zmień'}">${isEditEx?'✅':'✏️'}</button><button class="btn danger small" data-exdel="${ex.id}">✕</button></td>
       </tr>`);
   }
 
@@ -1910,15 +1912,27 @@ function refreshMealTotals(){
   });
 }
 
+const editingExercises=new Set();
 $('#addExBtn').addEventListener('click',()=>{
   const day=getDay(currentDay);
-  day.exercises.push({id:uid(),date:currentDay,time:nowTime(),timeEnd:'',durMin:null,cat:'',intens:'',desc:''});
+  const id=uid();
+  day.exercises.push({id,date:currentDay,time:nowTime(),timeEnd:'',durMin:null,cat:'',intens:'',desc:''});
+  editingExercises.add(id); // nowe ćwiczenie od razu do wypełnienia
   save(); renderDay();
 });
 $('#exTable').addEventListener('click',e=>{
+  const editm=e.target.closest('[data-exeditm]');
+  if(editm){
+    const id=editm.dataset.exeditm;
+    if(editingExercises.has(id)) editingExercises.delete(id);
+    else editingExercises.add(id);
+    renderDay();
+    return;
+  }
   const del=e.target.closest('[data-exdel]'); if(!del) return;
   const day=getDay(currentDay);
   day.exercises=day.exercises.filter(x=>x.id!==del.dataset.exdel);
+  editingExercises.delete(del.dataset.exdel);
   save(); renderDay();
 });
 $('#exTable').addEventListener('input',e=>{
@@ -2685,6 +2699,7 @@ function buildWeekReport(offset){
   });
   const logged=rows.filter(r=>r.logged);
   const avg=k=>logged.length?logged.reduce((a,r)=>a+r.t[k],0)/logged.length:null;
+  const avgN={}; NUTRIENTS.forEach(N=>avgN[N.key]=avg(N.key));
   const scored=logged.filter(r=>r.score!=null);
   const best =scored.length?scored.reduce((a,b)=>b.score>a.score?b:a):null;
   const worst=scored.length>1?scored.reduce((a,b)=>b.score<a.score?b:a):null;
@@ -2707,19 +2722,22 @@ function buildWeekReport(offset){
   // sen — średnia z nocy z wpisem
   const sleepVals=days.map(iso=>daySleepMin(iso)).filter(m=>m>0);
   const sleepAvg=sleepVals.length?sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length:null;
-  return {days,rows,logged:logged.length,avgKcal:avg('kcal'),avgB:avg('bialko'),avgW:avg('woda'),best,worst,wDelta,wA,wB,exTotal,exMinTotal,exKcalTotal,domCat,prevMin,sleepAvg,sleepN:sleepVals.length,tg};
+  return {days,rows,logged:logged.length,avgN,avgKcal:avgN.kcal,avgB:avgN.bialko,avgW:avgN.woda,best,worst,wDelta,wA,wB,exTotal,exMinTotal,exKcalTotal,domCat,prevMin,sleepAvg,sleepN:sleepVals.length,tg};
 }
 function weekRowsTable(R,forPrint){
+  const ens=enabledNutrients();
   const dayCell=r=>`${weekdayPL(r.iso).slice(0,3)}. ${fmtDatePL(r.iso).slice(0,5)}`;
+  const nh=ens.map(N=>forPrint
+    ? `<th class="vert"><span>${N.label} (${N.unit})</span></th>`
+    : `<th class="num">${N.label} (${N.unit})</th>`).join('');
+  const cellCls=forPrint?'class="numcell"':'class="num"';
   return `<table>
-    <thead><tr><th>Dzień</th><th class="num">Kalorie</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Ruch</th><th class="num">Wynik dnia</th></tr></thead>
+    <thead><tr><th>Dzień</th>${nh}${forPrint?'<th class="vert"><span>Ruch (min)</span></th><th class="vert"><span>Wynik dnia</span></th>':'<th class="num">Ruch</th><th class="num">Wynik dnia</th>'}</tr></thead>
     <tbody>${R.rows.map(r=>`<tr>
       <td>${dayCell(r)}</td>
-      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.logged?fmt(r.t.kcal,0):'—'}</td>
-      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.logged?fmt(r.t.bialko):'—'}</td>
-      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.logged?fmt(r.t.woda,2):'—'}</td>
-      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.exMin?fmt(r.exMin,0)+' min':(r.ex?r.ex+'×':'')}</td>
-      <td ${forPrint?'style="text-align:right"':'class="num"'}>${r.score!=null?r.score+'%':''}</td>
+      ${ens.map(N=>`<td ${cellCls}>${r.logged?fmt(r.t[N.key],N.dec):'—'}</td>`).join('')}
+      <td ${cellCls}>${r.exMin?fmt(r.exMin,0):(r.ex?r.ex+'×':'')}</td>
+      <td ${cellCls}>${r.score!=null?r.score+'%':''}</td>
     </tr>`).join('')}</tbody>
   </table>`;
 }
@@ -2731,9 +2749,11 @@ function renderWeekReport(){
   const cmp=(v,t,dec)=>v==null?'—':fmt(v,dec)+(t?` <span class="hint">/ ${fmt(t,dec)}</span>`:'');
   let html=`<div class="kpis">
     ${kpi(R.logged+'/7','dni z wpisami','')}
-    ${kpi(R.avgKcal!=null?fmt(R.avgKcal,0):'—','śr. kcal / dzień',tg.kcal?'cel: '+fmt(tg.kcal,0):'')}
-    ${kpi(R.avgB!=null?fmt(R.avgB):'—','śr. białko (g)',tg.bialko?'cel: '+fmt(tg.bialko,0):'')}
-    ${kpi(R.avgW!=null?fmt(R.avgW,2):'—','śr. woda (l)',tg.woda?'cel: '+fmt(tg.woda,1):'')}
+    ${enabledNutrients().map(N=>kpi(
+      R.avgN[N.key]!=null?fmt(R.avgN[N.key],N.dec):'—',
+      'śr. '+N.label.toLowerCase()+' ('+N.unit+')',
+      nutrientTarget(N.key)?'cel: '+fmt(nutrientTarget(N.key),N.dec):''
+    )).join('')}
     ${kpi(String(R.exTotal),'treningi',tg.exSessions?'cel: '+fmt(tg.exSessions,0):'')}
     ${kpi(R.exMinTotal?fmt(R.exMinTotal,0):'0','minuty ruchu',tg.exMin?'cel: '+fmt(tg.exMin,0)+' min':'')}
     ${kpi(R.exKcalTotal?'~'+fmt(R.exKcalTotal,0):'0','kcal spalone','szacunkowo')}
@@ -2770,14 +2790,15 @@ $('#printWeekBtn').addEventListener('click',()=>{
     ${weekRowsTable(R,true)}
     <h2>Średnie dzienne vs cel</h2>
     <table><thead><tr><th></th><th style="text-align:right">Średnio / dzień</th><th style="text-align:right">Cel</th><th>Ocena</th></tr></thead><tbody>
-      <tr><td>Kalorie (kcal)</td><td style="text-align:right">${fmt(R.avgKcal,0)}</td><td style="text-align:right">${fmt(tg.kcal,0)}</td><td>${arrAvg(R.avgKcal,tg.kcal,'kcal','kcal',0)}</td></tr>
-      <tr><td>Białko (g)</td><td style="text-align:right">${fmt(R.avgB)}</td><td style="text-align:right">${fmt(tg.bialko,0)}</td><td>${arrAvg(R.avgB,tg.bialko,'more','g',1)}</td></tr>
-      <tr><td>Woda (l)</td><td style="text-align:right">${fmt(R.avgW,2)}</td><td style="text-align:right">${fmt(tg.woda,1)}</td><td>${arrAvg(R.avgW,tg.woda,'more','l',2)}</td></tr>
+      ${enabledNutrients().map(N=>`<tr>
+        <td>${N.label} (${N.unit})</td>
+        <td style="text-align:right">${R.avgN[N.key]!=null?fmt(R.avgN[N.key],N.dec):'—'}</td>
+        <td style="text-align:right">${fmt(nutrientTarget(N.key),N.dec)}</td>
+        <td>${arrAvg(R.avgN[N.key],nutrientTarget(N.key),N.dir==='less'?'kcal':'more',N.unit,N.dec)}</td>
+      </tr>`).join('')}
     </tbody></table>
     ${R.best?`<div class="foot">🏆 Najlepszy dzień: <b>${weekdayPL(R.best.iso)} ${fmtDatePL(R.best.iso)}</b> (${R.best.score}%)${R.worst&&R.worst.iso!==R.best.iso?` &nbsp;·&nbsp; Najsłabszy: <b>${weekdayPL(R.worst.iso)} ${fmtDatePL(R.worst.iso)}</b> (${R.worst.score}%)`:''}</div>`:''}
-    ${printBarRow('Śr. kalorie',R.avgKcal??0,tg.kcal,'kcal',0,'less')}
-    ${printBarRow('Śr. białko',R.avgB??0,tg.bialko,'g',1,'more')}
-    ${printBarRow('Śr. woda',R.avgW??0,tg.woda,'l',2,'more')}
+    ${enabledNutrients().map(N=>printBarRow('Śr. '+N.label.toLowerCase(),R.avgN[N.key]??0,nutrientTarget(N.key),N.unit,N.dec,N.dir)).join('')}
   `);
 });
 
@@ -2796,16 +2817,21 @@ function monthInfo(offset){
   return {days,label};
 }
 function periodAggregates(days){
-  let loggedDays=0,k=0,b=0,w=0,exMin=0,exKcal=0,exCnt=0,slSum=0,slN=0;
+  let loggedDays=0,exMin=0,exKcal=0,exCnt=0,slSum=0,slN=0;
+  const sums={}; NUTRIENTS.forEach(N=>sums[N.key]=0);
   for(const iso of days){
     const d=state.days[iso];
-    if(d&&d.meals&&d.meals.length){ const t=dayTotals(iso); loggedDays++; k+=t.kcal; b+=t.bialko; w+=t.woda; }
+    if(d&&d.meals&&d.meals.length){
+      const t=dayTotals(iso); loggedDays++;
+      NUTRIENTS.forEach(N=>sums[N.key]+=t[N.key]);
+    }
     const es=dayExStats(iso); exMin+=es.min; exKcal+=es.kcal; exCnt+=es.count;
     const s=daySleepMin(iso); if(s){ slSum+=s; slN++; }
   }
+  const avgN={}; NUTRIENTS.forEach(N=>avgN[N.key]=loggedDays?sums[N.key]/loggedDays:null);
   return {
-    loggedDays,
-    avgK:loggedDays?k/loggedDays:null, avgB:loggedDays?b/loggedDays:null, avgW:loggedDays?w/loggedDays:null,
+    loggedDays, avgN,
+    avgK:avgN.kcal, avgB:avgN.bialko, avgW:avgN.woda,
     exMin,exKcal,exCnt, slAvg:slN?slSum/slN:null
   };
 }
@@ -2826,7 +2852,30 @@ function buildMonthReport(offset){
   const wStart=lastWeightOnOrBefore(isoAddDays(days[0],-1));
   const wEnd=lastWeightOnOrBefore(days[days.length-1]);
   const wDelta=(wStart&&wEnd&&wEnd.date>wStart.date)?wEnd.v-wStart.v:null;
-  return {label,prevLabel:prevInfo.label,days,agg,prev,weeks,wDelta};
+  // najlepszy / najsłabszy dzień miesiąca
+  const tgAll=state.profile.targets||{};
+  const dayScores=[];
+  for(const iso of days){
+    const d=state.days[iso];
+    if(!(d&&d.meals&&d.meals.length)) continue;
+    const sc=dayScore(dayTotals(iso),tgAll);
+    if(sc!=null) dayScores.push({iso,sc});
+  }
+  const best=dayScores.length?dayScores.reduce((a,b)=>b.sc>a.sc?b:a):null;
+  const worst=dayScores.length>1?dayScores.reduce((a,b)=>b.sc<a.sc?b:a):null;
+  // dominująca kategoria ruchu
+  const byCat={};
+  for(const iso of days){
+    const d=state.days[iso];
+    if(!d||!d.exercises) continue;
+    for(const ex of d.exercises){ const m2=exDurMin(ex); if(m2) byCat[ex.cat||'✨ Inne']=(byCat[ex.cat||'✨ Inne']||0)+m2; }
+  }
+  const domCat=Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0]||null;
+  // sen: najkrótsza i najdłuższa noc
+  const slVals=days.map(iso=>daySleepMin(iso)).filter(v=>v>0);
+  const slMin=slVals.length?Math.min(...slVals):null;
+  const slMax=slVals.length?Math.max(...slVals):null;
+  return {label,prevLabel:prevInfo.label,days,agg,prev,weeks,wDelta,best,worst,domCat,slMin,slMax,slN:slVals.length};
 }
 function monthDelta(v,pv,dec,goodUp){
   if(v==null||pv==null) return '';
@@ -2837,15 +2886,17 @@ function monthDelta(v,pv,dec,goodUp){
   return ` <span class="diff ${good?'good':'bad'}">${up?'▲':'▼'} ${fmt(Math.abs(diff),dec)}</span>`;
 }
 function monthWeeksTable(R,forPrint){
-  const al=forPrint?'style="text-align:right"':'class="num"';
+  const ens=enabledNutrients();
+  const al=forPrint?'class="numcell"':'class="num"';
+  const nh=ens.map(N=>forPrint
+    ? `<th class="vert"><span>śr. ${N.label} (${N.unit})</span></th>`
+    : `<th class="num">śr. ${N.label} (${N.unit})</th>`).join('');
   return `<table>
-    <thead><tr><th>Tydzień</th><th class="num">Dni z wpisami</th><th class="num">śr. kcal</th><th class="num">śr. białko (g)</th><th class="num">śr. woda (l)</th><th class="num">Ruch (min)</th><th class="num">śr. sen</th></tr></thead>
+    <thead><tr><th>Tydzień</th>${forPrint?'<th class="vert"><span>Dni z wpisami</span></th>':'<th class="num">Dni z wpisami</th>'}${nh}${forPrint?'<th class="vert"><span>Ruch (min)</span></th><th class="vert"><span>śr. sen</span></th>':'<th class="num">Ruch (min)</th><th class="num">śr. sen</th>'}</tr></thead>
     <tbody>${R.weeks.map(wk=>`<tr>
       <td>${fmtDatePL(wk.from).slice(0,5)} – ${fmtDatePL(wk.to).slice(0,5)}</td>
       <td ${al}>${wk.agg.loggedDays}</td>
-      <td ${al}>${wk.agg.avgK!=null?fmt(wk.agg.avgK,0):'—'}</td>
-      <td ${al}>${wk.agg.avgB!=null?fmt(wk.agg.avgB):'—'}</td>
-      <td ${al}>${wk.agg.avgW!=null?fmt(wk.agg.avgW,2):'—'}</td>
+      ${ens.map(N=>`<td ${al}>${wk.agg.avgN[N.key]!=null?fmt(wk.agg.avgN[N.key],N.dec):'—'}</td>`).join('')}
       <td ${al}>${wk.agg.exMin?fmt(wk.agg.exMin,0):''}</td>
       <td ${al}>${wk.agg.slAvg!=null?fmtDur(Math.round(wk.agg.slAvg)):'—'}</td>
     </tr>`).join('')}</tbody></table>`;
@@ -2856,15 +2907,23 @@ function renderMonthReport(){
   const kpi=(v,l,s)=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div><div class="s">${s||''}</div></div>`;
   let html=`<div class="kpis">
     ${kpi(R.agg.loggedDays+'/'+R.days.length,'dni z wpisami',''+monthDelta(R.agg.loggedDays,R.prev.loggedDays,0,true))}
-    ${kpi(R.agg.avgK!=null?fmt(R.agg.avgK,0):'—','śr. kcal / dzień',''+monthDelta(R.agg.avgK,R.prev.avgK,0,false))}
-    ${kpi(R.agg.avgB!=null?fmt(R.agg.avgB):'—','śr. białko (g)',''+monthDelta(R.agg.avgB,R.prev.avgB,1,true))}
-    ${kpi(R.agg.avgW!=null?fmt(R.agg.avgW,2):'—','śr. woda (l)',''+monthDelta(R.agg.avgW,R.prev.avgW,2,true))}
+    ${enabledNutrients().map(N=>kpi(
+      R.agg.avgN[N.key]!=null?fmt(R.agg.avgN[N.key],N.dec):'—',
+      'śr. '+N.label.toLowerCase()+' ('+N.unit+')',
+      ''+monthDelta(R.agg.avgN[N.key],R.prev.avgN[N.key],N.dec,N.dir==='more')
+    )).join('')}
     ${kpi(fmt(R.agg.exMin,0),'min ruchu',''+monthDelta(R.agg.exMin,R.prev.exMin,0,true))}
     ${kpi(R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—','śr. sen / noc',''+monthDelta(R.agg.slAvg!=null?R.agg.slAvg/60:null,R.prev.slAvg!=null?R.prev.slAvg/60:null,1,true))}
     ${kpi(R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—','zmiana wagi','w tym miesiącu')}
   </div>
-  <p class="hint">Strzałki = porównanie z poprzednim miesiącem (${R.prevLabel}).</p>
-  <div class="tscroll">${monthWeeksTable(R,false)}</div>`;
+  <p class="hint">Strzałki = porównanie z poprzednim miesiącem (${R.prevLabel}).</p>`;
+  const bits=[];
+  if(R.best) bits.push(`🏆 Najlepszy dzień: <b>${fmtDatePL(R.best.iso)}</b> (${R.best.sc}%)`);
+  if(R.worst&&(!R.best||R.worst.iso!==R.best.iso)) bits.push(`😬 Najsłabszy: <b>${fmtDatePL(R.worst.iso)}</b> (${R.worst.sc}%)`);
+  if(R.domCat) bits.push(`🏃 Najwięcej ruchu: <b>${esc(R.domCat[0])}</b> (${fmt(R.domCat[1],0)} min)`);
+  if(R.slMin!=null) bits.push(`😴 sen: od ${fmtDur(R.slMin)} do ${fmtDur(R.slMax)}`);
+  if(bits.length) html+=`<p class="hint">${bits.join(' · ')}</p>`;
+  html+=`<div class="tscroll">${monthWeeksTable(R,false)}</div>`;
   $('#monthReportWrap').innerHTML=html;
   renderMonthWeightChart();
 }
@@ -2888,23 +2947,46 @@ function renderMonthWeightChart(){
 }
 $('#printMonthBtn').addEventListener('click',()=>{
   const R=buildMonthReport(monthOffset);
+  const ens=enabledNutrients();
+  const arr=(v,t,N)=>v==null?'':arrowFor(v,t,N.dir==='less'?'kcal':'more',N.unit,N.dec);
   doPrint(`
     <h1>🌿 Raport miesięczny — ${R.label}</h1>
     <div class="phead">
       <span>Dni z wpisami: <b>${R.agg.loggedDays}/${R.days.length}</b></span>
+      <span>Treningi: <b>${R.agg.exCnt}</b></span>
       <span>Ruch: <b>${fmt(R.agg.exMin,0)} min</b> (~${fmt(R.agg.exKcal,0)} kcal)</span>
       <span>Śr. sen: <b>${R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—'}</b></span>
       <span>Zmiana wagi: <b>${R.wDelta!=null?(R.wDelta>0?'+':'')+fmt(R.wDelta)+' kg':'—'}</b></span>
     </div>
+    <h2>Średnie dzienne vs cel</h2>
+    <table><thead><tr><th></th><th style="text-align:right">Średnio / dzień</th><th style="text-align:right">Cel</th><th>Ocena</th></tr></thead><tbody>
+      ${ens.map(N=>`<tr>
+        <td>${N.label} (${N.unit})</td>
+        <td style="text-align:right">${R.agg.avgN[N.key]!=null?fmt(R.agg.avgN[N.key],N.dec):'—'}</td>
+        <td style="text-align:right">${fmt(nutrientTarget(N.key),N.dec)}</td>
+        <td>${arr(R.agg.avgN[N.key],nutrientTarget(N.key),N)}</td>
+      </tr>`).join('')}
+    </tbody></table>
+    ${ens.map(N=>printBarRow('Śr. '+N.label.toLowerCase(),R.agg.avgN[N.key]??0,nutrientTarget(N.key),N.unit,N.dec,N.dir)).join('')}
     <h2>Tygodnie miesiąca</h2>
     ${monthWeeksTable(R,true)}
+    ${R.best?`<div class="foot">🏆 Najlepszy dzień: <b>${weekdayPL(R.best.iso)} ${fmtDatePL(R.best.iso)}</b> (${R.best.sc}%)${R.worst&&R.worst.iso!==R.best.iso?` &nbsp;·&nbsp; Najsłabszy: <b>${weekdayPL(R.worst.iso)} ${fmtDatePL(R.worst.iso)}</b> (${R.worst.sc}%)`:''}</div>`:''}
+    <h2>Aktywność i sen</h2>
+    <table><tbody>
+      <tr><td>Treningi</td><td style="text-align:right"><b>${R.agg.exCnt}</b> (${fmt(R.agg.exMin,0)} min, ~${fmt(R.agg.exKcal,0)} kcal)</td></tr>
+      ${R.domCat?`<tr><td>Najczęstsza aktywność</td><td style="text-align:right"><b>${esc(R.domCat[0])}</b> (${fmt(R.domCat[1],0)} min)</td></tr>`:''}
+      <tr><td>Sen — średnio / noc</td><td style="text-align:right"><b>${R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—'}</b>${R.slMin!=null?` (najkrótszy ${fmtDur(R.slMin)}, najdłuższy ${fmtDur(R.slMax)}, ${R.slN} nocy z wpisem)`:''}</td></tr>
+    </tbody></table>
     <h2>Porównanie z poprzednim miesiącem (${R.prevLabel})</h2>
     <table><thead><tr><th></th><th style="text-align:right">${R.label}</th><th style="text-align:right">${R.prevLabel}</th></tr></thead><tbody>
       <tr><td>Dni z wpisami</td><td style="text-align:right">${R.agg.loggedDays}</td><td style="text-align:right">${R.prev.loggedDays}</td></tr>
-      <tr><td>Śr. kalorie (kcal/d)</td><td style="text-align:right">${R.agg.avgK!=null?fmt(R.agg.avgK,0):'—'}</td><td style="text-align:right">${R.prev.avgK!=null?fmt(R.prev.avgK,0):'—'}</td></tr>
-      <tr><td>Śr. białko (g/d)</td><td style="text-align:right">${R.agg.avgB!=null?fmt(R.agg.avgB):'—'}</td><td style="text-align:right">${R.prev.avgB!=null?fmt(R.prev.avgB):'—'}</td></tr>
-      <tr><td>Śr. woda (l/d)</td><td style="text-align:right">${R.agg.avgW!=null?fmt(R.agg.avgW,2):'—'}</td><td style="text-align:right">${R.prev.avgW!=null?fmt(R.prev.avgW,2):'—'}</td></tr>
+      ${ens.map(N=>`<tr>
+        <td>Śr. ${N.label.toLowerCase()} (${N.unit}/d)</td>
+        <td style="text-align:right">${R.agg.avgN[N.key]!=null?fmt(R.agg.avgN[N.key],N.dec):'—'}</td>
+        <td style="text-align:right">${R.prev.avgN[N.key]!=null?fmt(R.prev.avgN[N.key],N.dec):'—'}</td>
+      </tr>`).join('')}
       <tr><td>Ruch (min)</td><td style="text-align:right">${fmt(R.agg.exMin,0)}</td><td style="text-align:right">${fmt(R.prev.exMin,0)}</td></tr>
+      <tr><td>Treningi</td><td style="text-align:right">${R.agg.exCnt}</td><td style="text-align:right">${R.prev.exCnt}</td></tr>
       <tr><td>Śr. sen / noc</td><td style="text-align:right">${R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—'}</td><td style="text-align:right">${R.prev.slAvg!=null?fmtDur(Math.round(R.prev.slAvg)):'—'}</td></tr>
     </tbody></table>
   `);
