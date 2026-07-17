@@ -61,13 +61,14 @@
   .undoFloat .cnt{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
   .btn:disabled{opacity:.35;cursor:default;pointer-events:none}
 
-  /* ---------- zablokowane wpisy posiłków (edycja przez ✏️) ---------- */
-  .meal table input:disabled{
+  /* ---------- zablokowane wpisy (edycja przez ✏️): posiłki, produkty, ćwiczenia ---------- */
+  .meal table input:disabled,#prodTable input:disabled,#exTable input:disabled,#exTable select:disabled{
     background:transparent;border-color:transparent;color:var(--ink);
     opacity:1;-webkit-text-fill-color:var(--ink);cursor:default;box-shadow:none;
   }
-  .meal tr.editing td{background:rgba(14,159,120,.06)}
-  .meal tr.editing input:not(:disabled){border-color:var(--brand)}
+  #exTable select:disabled{appearance:none;-webkit-appearance:none}
+  .meal tr.editing td,#prodTable tr.editing td,#exTable tr.editing td{background:rgba(14,159,120,.06)}
+  .meal tr.editing input:not(:disabled),#prodTable tr.editing input:not(:disabled),#exTable tr.editing input:not(:disabled){border-color:var(--brand)}
 
   /* ---------- tabs (desktop: pasek u góry) ---------- */
   nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
@@ -2434,22 +2435,27 @@ $('#printBtn').addEventListener('click',()=>{
 });
 
 /* ================= PRODUKTY ================= */
+const editingProducts=new Set();
 function renderProducts(){
   const ens=enabledNutrients();
   $('#prodTable thead').innerHTML=`<tr><th>Nazwa produktu / posiłku</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr>`;
   const tb=$('#prodTable tbody'); tb.innerHTML='';
   for(const p of state.products){
+    const isEdit=editingProducts.has(p.id);
+    const lock=isEdit?'':'disabled';
     tb.insertAdjacentHTML('beforeend',`
-      <tr data-prid="${p.id}">
-        <td><input type="text" value="${esc(p.name)}" data-prf="name" placeholder="nazwa..."></td>
-        ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" style="width:90px;text-align:right" value="${p[N.key]??''}" data-prf="${N.key}"></td>`).join('')}
-        <td><button class="btn danger small" data-prdel="${p.id}">✕</button></td>
+      <tr data-prid="${p.id}" class="${isEdit?'editing':''}">
+        <td><input type="text" value="${esc(p.name)}" data-prf="name" placeholder="nazwa..." ${lock}></td>
+        ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" style="width:90px;text-align:right" value="${p[N.key]??''}" data-prf="${N.key}" ${lock}></td>`).join('')}
+        <td style="white-space:nowrap"><button class="btn plain small" data-preditm="${p.id}" title="${isEdit?'Zatwierdź zmiany':'Zmień'}">${isEdit?'✅':'✏️'}</button><button class="btn danger small" data-prdel="${p.id}">✕</button></td>
       </tr>`);
   }
   if(!state.products.length) tb.innerHTML=`<tr><td colspan="${ens.length+2}" class="hint">Baza jest pusta — dodaj pierwszy produkt.</td></tr>`;
 }
 $('#addProdBtn').addEventListener('click',()=>{
-  state.products.push({id:uid(),name:'',bialko:null,woda:null,kcal:null});
+  const id=uid();
+  state.products.push({id,name:'',bialko:null,woda:null,kcal:null});
+  editingProducts.add(id); // nowy produkt od razu do wypełnienia
   save(); renderProducts();
   const last=$$('#prodTable tbody tr[data-prid]').pop();
   if(last) last.querySelector('input').focus();
@@ -2462,8 +2468,17 @@ $('#prodTable').addEventListener('input',e=>{
   save();
 });
 $('#prodTable').addEventListener('click',e=>{
+  const editm=e.target.closest('[data-preditm]');
+  if(editm){
+    const id=editm.dataset.preditm;
+    if(editingProducts.has(id)) editingProducts.delete(id);
+    else editingProducts.add(id);
+    renderProducts();
+    return;
+  }
   const del=e.target.closest('[data-prdel]'); if(!del) return;
   state.products=state.products.filter(x=>x.id!==del.dataset.prdel);
+  editingProducts.delete(del.dataset.prdel);
   save(); renderProducts();
 });
 
