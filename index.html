@@ -411,6 +411,11 @@
     #printArea .arr{font-weight:700}
     #printArea .arr.bad{color:#c0392b}
     #printArea .arr.good{color:#1a7a3d}
+    #printArea h2{page-break-after:avoid}
+    #printArea .pchart{margin:3mm 0;page-break-inside:avoid}
+    #printArea .pchart img{width:100%;max-height:72mm;object-fit:contain;border:1px solid #ccc;border-radius:4px}
+    #printArea table{page-break-inside:auto}
+    #printArea tr{page-break-inside:avoid}
   }
 </style>
 </head>
@@ -1245,6 +1250,23 @@ let toastTimer=null;
 function toast(msg){
   const el=$('#toast'); el.textContent=msg; el.classList.add('show');
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+/* zrzut wykresu Chart.js do <img> na wydruk (białe tło, żeby druk był czytelny) */
+function chartImg(id,title){
+  if(typeof Chart==='undefined') return '';
+  const c=document.getElementById(id);
+  if(!c||!c.width) return '';
+  const ch=Chart.getChart(c);
+  if(!ch) return '';
+  try{
+    const tmp=document.createElement('canvas');
+    tmp.width=c.width; tmp.height=c.height;
+    const ctx=tmp.getContext('2d');
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,tmp.width,tmp.height);
+    ctx.drawImage(c,0,0);
+    return `<div class="pchart"><div class="pbarlab">${title}</div><img src="${tmp.toDataURL('image/png')}" alt="${title}"></div>`;
+  }catch(e){ return ''; }
 }
 function doPrint(html){
   $('#printArea').innerHTML=html
@@ -2799,6 +2821,14 @@ $('#printWeekBtn').addEventListener('click',()=>{
     </tbody></table>
     ${R.best?`<div class="foot">🏆 Najlepszy dzień: <b>${weekdayPL(R.best.iso)} ${fmtDatePL(R.best.iso)}</b> (${R.best.score}%)${R.worst&&R.worst.iso!==R.best.iso?` &nbsp;·&nbsp; Najsłabszy: <b>${weekdayPL(R.worst.iso)} ${fmtDatePL(R.worst.iso)}</b> (${R.worst.score}%)`:''}</div>`:''}
     ${enabledNutrients().map(N=>printBarRow('Śr. '+N.label.toLowerCase(),R.avgN[N.key]??0,nutrientTarget(N.key),N.unit,N.dec,N.dir)).join('')}
+    <h2>Wykresy</h2>
+    ${chartImg('intakeChart','Dzienne spożycie — ostatnie 14 dni')}
+    ${chartImg('mealTimesChart','Pory posiłków i treningów — ostatnie 14 dni')}
+    ${chartImg('exWeekChart','Minuty ruchu / tydzień — ostatnie 8 tygodni')}
+    ${chartImg('exCatChart','Rodzaje aktywności — ostatnie 30 dni')}
+    ${chartImg('sleepChart','Sen — ostatnie 14 dni')}
+    <h2>Średnie wartości posiłków — ostatnie 30 dni</h2>
+    ${$('#mealAvgWrap').innerHTML}
   `);
 });
 
@@ -2989,6 +3019,21 @@ $('#printMonthBtn').addEventListener('click',()=>{
       <tr><td>Treningi</td><td style="text-align:right">${R.agg.exCnt}</td><td style="text-align:right">${R.prev.exCnt}</td></tr>
       <tr><td>Śr. sen / noc</td><td style="text-align:right">${R.agg.slAvg!=null?fmtDur(Math.round(R.agg.slAvg)):'—'}</td><td style="text-align:right">${R.prev.slAvg!=null?fmtDur(Math.round(R.prev.slAvg)):'—'}</td></tr>
     </tbody></table>
+    <h2>Wykresy</h2>
+    ${chartImg('monthWeightChart','Waga — średnia krocząca (3 pomiary)')}
+    ${chartImg('metricChart','Postęp parametru w czasie')}
+    ${chartImg('intakeChart','Dzienne spożycie — ostatnie 14 dni')}
+    ${chartImg('mealTimesChart','Pory posiłków i treningów — ostatnie 14 dni')}
+    ${chartImg('exWeekChart','Minuty ruchu / tydzień — ostatnie 8 tygodni')}
+    ${chartImg('exCatChart','Rodzaje aktywności — ostatnie 30 dni')}
+    ${chartImg('sleepChart','Sen — ostatnie 14 dni')}
+    ${chartImg('corrChart','Korelacje — waga a spożycie')}
+    <h2>Średnie wartości posiłków — ostatnie 30 dni</h2>
+    ${$('#mealAvgWrap').innerHTML}
+    <h2>Korelacje — waga a spożycie</h2>
+    ${$('#corrWrap').innerHTML}
+    <h2>Tabela postępów (start → ostatni pomiar → cel)</h2>
+    ${$('#statsTableWrap').innerHTML}
   `);
 });
 
