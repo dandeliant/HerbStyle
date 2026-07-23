@@ -194,6 +194,10 @@
   canvas{max-height:340px}
   .chartbox{position:relative;min-height:280px}
 
+  .pdgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .pdgrid button{border:1px solid var(--line);background:var(--soft);color:var(--brand2);border-radius:9px;padding:9px 6px;font-weight:700;cursor:pointer;font-size:.95rem;font-family:inherit;transition:background .15s,color .15s}
+  .pdgrid button:hover{background:var(--brand);color:#fff}
+
   dialog{border:none;border-radius:var(--radius);box-shadow:0 24px 70px rgba(10,20,30,.35);padding:0;max-width:760px;width:95%}
   dialog::backdrop{background:rgba(14,22,30,.5);backdrop-filter:blur(3px)}
   dialog .dbody{padding:22px 26px;max-height:82vh;overflow-y:auto}
@@ -737,7 +741,8 @@
   <section class="tab" id="tab-produkty">
     <div class="card">
       <h2>🍎 Baza produktów i posiłków</h2>
-      <p class="hint">Zapisz raz swoje typowe produkty i posiłki (np. „Koktajl proteinowy: 18 g białka, 220 kcal”), a potem dodawaj je w Dzienniku <b>jednym kliknięciem</b> z listy „＋ z bazy produktów”. Możesz też zapisać dowolny wpis z dziennika do bazy przyciskiem ⭐. Wszystko jest edytowalne w każdej chwili.</p>
+      <p class="hint">Zapisz raz swoje typowe produkty i posiłki (np. „Koktajl proteinowy: 18 g białka, 220 kcal”), a potem dodawaj je w Dzienniku <b>jednym kliknięciem</b> z listy „＋ z bazy produktów”. Możesz też zapisać dowolny wpis z dziennika do bazy przyciskiem ⭐. Wszystko jest edytowalne (✏️).<br>
+      <b>Porcja (g)</b> — podaj, ilu gramów dotyczą wartości (np. 100). Przy dodawaniu do dziennika wpiszesz wtedy zjedzone gramy (np. 20 g), a wartości przeliczą się same; zawsze dostępny jest też mnożnik ×½–×6 lub własny.</p>
       <div class="tscroll">
         <table id="prodTable">
           <thead><tr><th>Nazwa produktu / posiłku</th><th class="num">Białko (g)</th><th class="num">Woda (l)</th><th class="num">Kalorie (kcal)</th><th></th></tr></thead>
@@ -830,6 +835,34 @@
     <div class="copy">Copyright © <span id="copyYear"></span> Daniel Ostrowski. Wszelkie prawa zastrzeżone.</div>
   </footer>
 </div>
+
+<!-- ============ MODAL: PORCJA / MNOŻNIK ============ -->
+<dialog id="portionDialog">
+  <div class="dbody" style="max-width:440px">
+    <h2 style="color:var(--brand2)">⚖️ Jaka porcja?</h2>
+    <p id="pdName" style="margin:0 0 12px"></p>
+    <label class="f">Szybki mnożnik (kliknięcie od razu dodaje)</label>
+    <div class="pdgrid">
+      <button data-pdm="0.5">×½</button>
+      <button data-pdm="1">×1</button>
+      <button data-pdm="1.5">×1,5</button>
+      <button data-pdm="2">×2</button>
+      <button data-pdm="3">×3</button>
+      <button data-pdm="4">×4</button>
+      <button data-pdm="5">×5</button>
+      <button data-pdm="6">×6</button>
+    </div>
+    <div class="grid2" style="margin-top:12px;gap:10px">
+      <div><label class="f">Własny mnożnik</label><input type="number" id="pdMult" step="0.05" min="0" value="1"></div>
+      <div id="pdGramsBox" style="display:none"><label class="f">…albo gramy (baza: <span id="pdBaseG"></span> g)</label><input type="number" id="pdGrams" step="1" min="0" placeholder="np. 20"></div>
+    </div>
+    <p class="hint" id="pdPreview" style="margin:12px 0 14px"></p>
+    <div class="flexrow">
+      <button class="btn primary" id="pdOk">＋ Dodaj</button>
+      <button class="btn ghost" id="pdCancel">Anuluj</button>
+    </div>
+  </div>
+</dialog>
 
 <!-- ============ MODAL: SYNCHRONIZACJA Z BAZĄ PRODUKTÓW ============ -->
 <dialog id="prodSyncDialog">
@@ -1553,6 +1586,77 @@ $('#nextDay').addEventListener('click',()=>shiftDay(1));
 $('#todayBtn').addEventListener('click',()=>{ currentDay=todayStr(); renderDay(); });
 function shiftDay(n){ currentDay=isoAddDays(currentDay,n); renderDay(); }
 
+/* ---------- dialog porcji: mnożnik ×½–×6, własny, albo gramy z porcji bazowej ---------- */
+let pdResolve=null, pdCtx=null;
+function scaleVal(v,f,N){
+  if(v==null) return null;
+  const p=10**Math.max(N.dec,1);
+  return Math.round(v*f*p)/p;
+}
+function scaledVals(baseVals,f){
+  const o={};
+  for(const N of NUTRIENTS) o[N.key]=scaleVal(baseVals[N.key],f,N);
+  return o;
+}
+/* zwraca Promise<{f, suffix}|null>; portionG=null ukrywa pole gramów */
+function portionDialog(name,baseVals,portionG,okLabel){
+  return new Promise(res=>{
+    pdResolve=res;
+    pdCtx={baseVals,portionG:(portionG!=null&&portionG>0)?portionG:null};
+    const baseTxt=enabledNutrients().filter(N=>baseVals[N.key]!=null).map(N=>`${fmt(baseVals[N.key],N.dec)} ${N.unit}`).join(' · ');
+    $('#pdName').innerHTML=`<b>${esc(name)}</b>${baseTxt?`<br><span class="hint">wartości bazowe${pdCtx.portionG?` (na ${fmt(pdCtx.portionG,0)} g)`:''}: ${baseTxt}</span>`:''}`;
+    $('#pdMult').value='1';
+    $('#pdGrams').value='';
+    $('#pdGramsBox').style.display=pdCtx.portionG?'':'none';
+    if(pdCtx.portionG) $('#pdBaseG').textContent=fmt(pdCtx.portionG,0);
+    $('#pdOk').textContent=okLabel||'＋ Dodaj';
+    updatePdPreview();
+    $('#portionDialog').showModal();
+  });
+}
+function pdFactor(){
+  const g=parseNum($('#pdGrams').value);
+  if(pdCtx&&pdCtx.portionG&&g!=null&&g>0) return g/pdCtx.portionG;
+  const m=parseNum($('#pdMult').value);
+  return (m!=null&&m>0)?m:1;
+}
+function pdSuffix(f){
+  const g=parseNum($('#pdGrams').value);
+  if(pdCtx&&pdCtx.portionG&&g!=null&&g>0) return ` (${fmt(g,0)} g)`;
+  return Math.abs(f-1)<0.001?'':` ×${fmt(f,2)}`;
+}
+function updatePdPreview(){
+  if(!pdCtx) return;
+  const f=pdFactor();
+  const parts=enabledNutrients().filter(N=>pdCtx.baseVals[N.key]!=null)
+    .map(N=>`${N.label}: <b>${fmt(scaleVal(pdCtx.baseVals[N.key],f,N),N.dec)}</b> ${N.unit}`);
+  $('#pdPreview').innerHTML=`Po przeliczeniu ×${fmt(f,2)}: ${parts.join(' · ')||'—'}`;
+}
+function pdFinish(result){
+  const r=pdResolve; pdResolve=null; pdCtx=null;
+  $('#portionDialog').close();
+  if(r) r(result);
+}
+$('#portionDialog').addEventListener('input',e=>{
+  if(e.target.id==='pdMult') $('#pdGrams').value='';
+  updatePdPreview();
+});
+$('#portionDialog').addEventListener('click',e=>{
+  const q=e.target.closest('[data-pdm]');
+  if(q){
+    $('#pdGrams').value='';
+    $('#pdMult').value=q.dataset.pdm;
+    const f=pdFactor();
+    pdFinish({f,suffix:pdSuffix(f)});
+  }
+});
+$('#pdOk').addEventListener('click',()=>{
+  const f=pdFactor();
+  pdFinish({f,suffix:pdSuffix(f)});
+});
+$('#pdCancel').addEventListener('click',()=>pdFinish(null));
+$('#portionDialog').addEventListener('cancel',e=>{ e.preventDefault(); pdFinish(null); });
+
 /* ---------- dialog: aktualizacja / dodanie produktu do bazy ---------- */
 function productDialog(text,buttons){
   return new Promise(res=>{
@@ -1716,7 +1820,7 @@ function renderDay(){
             <td><input type="time" value="${e.time||''}" data-fld="time" ${lock} class="${timeOutsideWindow(M.key,e.time)?'badtime':''}" ${timeOutsideWindow(M.key,e.time)?'title="Poza optymalnym oknem ('+hoursLbl+')"':''}></td>
             <td><input type="text" value="${esc(e.desc||'')}" placeholder="opis posiłku..." data-fld="desc" list="mealHistList" ${lock}></td>
             ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" value="${e[N.key]??''}" data-fld="${N.key}" ${lock}></td>`).join('')}
-            <td style="white-space:nowrap"><button class="btn plain small" data-editm="${e.id}" title="${isEdit?'Zatwierdź zmiany':'Zmień'}">${isEdit?'✅':'✏️'}</button><button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
+            <td style="white-space:nowrap"><button class="btn plain small" data-editm="${e.id}" title="${isEdit?'Zatwierdź zmiany':'Zmień'}">${isEdit?'✅':'✏️'}</button>${isEdit?`<button class="btn plain small" data-scale="${e.id}" title="Przelicz porcję (mnożnik)">⚖️</button>`:''}<button class="btn plain small" data-star="${e.id}" title="Zapisz do bazy produktów">⭐</button><button class="btn danger small" data-del="${e.id}" title="Usuń">✕</button></td>
           </tr>`;
         }).join('')}
           <tr class="mealsum">
@@ -1861,6 +1965,22 @@ $('#mealsContainer').addEventListener('click',e=>{
     offerProductSync(m,{askWhenNew:false,source:'star'}).then(()=>renderDay());
     return;
   }
+  const sc=e.target.closest('[data-scale]');
+  if(sc){
+    const day=getDay(currentDay);
+    const m=day.meals.find(x=>x.id===sc.dataset.scale);
+    if(!m) return;
+    (async()=>{
+      const baseVals=productValsFromEntry(m);
+      const res=await portionDialog(m.desc||'wpis',baseVals,null,'✔ Przelicz');
+      if(!res) return;
+      const vals=scaledVals(baseVals,res.f);
+      for(const N of NUTRIENTS) m[N.key]=vals[N.key];
+      save(); renderDay();
+      toast('⚖️ Przeliczono ×'+fmt(res.f,2));
+    })();
+    return;
+  }
   const del=e.target.closest('[data-del]');
   if(del){
     const day=getDay(currentDay);
@@ -1884,14 +2004,21 @@ $('#mealsContainer').addEventListener('change',e=>{
   const sel=e.target.closest('[data-prodsel]');
   if(!sel || !sel.value) return;
   const p=state.products.find(x=>x.id===sel.value);
+  const mealType=sel.dataset.prodsel;
   sel.value='';
   if(!p) return;
-  const day=getDay(currentDay);
-  const entry={id:uid(),type:sel.dataset.prodsel,time:nowTime(),desc:p.name,createdAt:new Date().toISOString()};
-  for(const N of NUTRIENTS) entry[N.key]=p[N.key]??null;
-  day.meals.push(entry);
-  save(); renderDay();
-  toast('＋ '+p.name);
+  (async()=>{
+    const baseVals={}; for(const N of NUTRIENTS) baseVals[N.key]=parseNum(p[N.key]);
+    const res=await portionDialog(p.name,baseVals,parseNum(p.portion),'＋ Dodaj do dziennika');
+    if(!res) return;
+    const vals=scaledVals(baseVals,res.f);
+    const day=getDay(currentDay);
+    const entry={id:uid(),type:mealType,time:nowTime(),desc:p.name+res.suffix,createdAt:new Date().toISOString()};
+    for(const N of NUTRIENTS) entry[N.key]=vals[N.key];
+    day.meals.push(entry);
+    save(); renderDay();
+    toast('＋ '+p.name+res.suffix);
+  })();
 });
 $('#mealsContainer').addEventListener('input',e=>{
   const tr=e.target.closest('tr[data-id]'); if(!tr) return;
@@ -2221,10 +2348,13 @@ function renderFoodPop(){
   ).join('');
   hideFpSuggest();
 }
-$('#foodPopList').addEventListener('click',e=>{
+$('#foodPopList').addEventListener('click',async e=>{
   const b=e.target.closest('[data-fpid]'); if(!b) return;
   const p=state.products.find(x=>x.id===b.dataset.fpid); if(!p) return;
-  addQuickMeal(p.name,p);
+  const baseVals={}; for(const N of NUTRIENTS) baseVals[N.key]=parseNum(p[N.key]);
+  const res=await portionDialog(p.name,baseVals,parseNum(p.portion),'＋ Dodaj do dziennika');
+  if(!res) return;
+  addQuickMeal(p.name+res.suffix,scaledVals(baseVals,res.f));
   $('#foodPop').classList.remove('open');
 });
 /* podpowiedzi z historii w szybkim jedzeniu */
@@ -2241,12 +2371,17 @@ $('#fpName').addEventListener('input',()=>{
     return `<button data-fph="${esc(h.name)}">${esc(h.name)}<div class="sub">${sub?sub+' · ':''}×${h.count}, ostatnio ${fmtDatePL(h.lastDate)}</div></button>`;
   }).join('');
 });
-$('#fpSuggest').addEventListener('click',e=>{
+$('#fpSuggest').addEventListener('click',async e=>{
   const b=e.target.closest('[data-fph]'); if(!b) return;
   const h=mealHistory().find(x=>x.name===b.dataset.fph); if(!h) return;
-  $('#fpName').value=h.name;
-  $$('#fpNutriGrid [data-fpn]').forEach(i=>{ const v=h.vals[i.dataset.fpn]; i.value=v!=null?v:''; });
   hideFpSuggest();
+  // jeśli nazwa odpowiada produktowi z bazy — użyj jego porcji bazowej do przelicznika gramów
+  const p=state.products.find(x=>(x.name||'').trim().toLowerCase()===h.name.toLowerCase());
+  const res=await portionDialog(h.name,h.vals,p?parseNum(p.portion):null,'✔ Użyj');
+  if(!res) { $('#fpName').value=h.name; return; }
+  const vals=scaledVals(h.vals,res.f);
+  $('#fpName').value=h.name+res.suffix;
+  $$('#fpNutriGrid [data-fpn]').forEach(i=>{ const v=vals[i.dataset.fpn]; i.value=v!=null?v:''; });
 });
 $('#fpAddBtn').addEventListener('click',()=>{
   const name=$('#fpName').value.trim();
@@ -2488,7 +2623,7 @@ $('#printBtn').addEventListener('click',()=>{
 const editingProducts=new Set();
 function renderProducts(){
   const ens=enabledNutrients();
-  $('#prodTable thead').innerHTML=`<tr><th>Nazwa produktu / posiłku</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr>`;
+  $('#prodTable thead').innerHTML=`<tr><th>Nazwa produktu / posiłku</th><th class="num" title="Ile gramów dotyczą wartości (np. 100). Pozwala przy dodawaniu przeliczać na zjedzone gramy.">Porcja (g)</th>${ens.map(N=>`<th class="num">${N.label} (${N.unit})</th>`).join('')}<th></th></tr>`;
   const tb=$('#prodTable tbody'); tb.innerHTML='';
   for(const p of state.products){
     const isEdit=editingProducts.has(p.id);
@@ -2496,11 +2631,12 @@ function renderProducts(){
     tb.insertAdjacentHTML('beforeend',`
       <tr data-prid="${p.id}" class="${isEdit?'editing':''}">
         <td><input type="text" value="${esc(p.name)}" data-prf="name" placeholder="nazwa..." ${lock}></td>
+        <td class="num"><input type="number" step="1" min="0" style="width:80px;text-align:right" value="${p.portion??''}" data-prf="portion" placeholder="np. 100" ${lock}></td>
         ${ens.map(N=>`<td class="num"><input type="number" step="${N.step}" style="width:90px;text-align:right" value="${p[N.key]??''}" data-prf="${N.key}" ${lock}></td>`).join('')}
         <td style="white-space:nowrap"><button class="btn plain small" data-preditm="${p.id}" title="${isEdit?'Zatwierdź zmiany':'Zmień'}">${isEdit?'✅':'✏️'}</button><button class="btn danger small" data-prdel="${p.id}">✕</button></td>
       </tr>`);
   }
-  if(!state.products.length) tb.innerHTML=`<tr><td colspan="${ens.length+2}" class="hint">Baza jest pusta — dodaj pierwszy produkt.</td></tr>`;
+  if(!state.products.length) tb.innerHTML=`<tr><td colspan="${ens.length+3}" class="hint">Baza jest pusta — dodaj pierwszy produkt.</td></tr>`;
 }
 $('#addProdBtn').addEventListener('click',()=>{
   const id=uid();
