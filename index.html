@@ -2375,12 +2375,20 @@ $('#fpSuggest').addEventListener('click',async e=>{
   const b=e.target.closest('[data-fph]'); if(!b) return;
   const h=mealHistory().find(x=>x.name===b.dataset.fph); if(!h) return;
   hideFpSuggest();
-  // jeśli nazwa odpowiada produktowi z bazy — użyj jego porcji bazowej do przelicznika gramów
-  const p=state.products.find(x=>(x.name||'').trim().toLowerCase()===h.name.toLowerCase());
-  const res=await portionDialog(h.name,h.vals,p?parseNum(p.portion):null,'✔ Użyj');
+  // jeśli nazwa (po odcięciu sufiksu ×N / (N g)) odpowiada produktowi z bazy —
+  // użyj JEGO wartości i porcji jako podstawy przelicznika gramów
+  const cleanN=h.name.replace(/\s*(×[\d.,]+|\(\d+\s*g\))\s*$/i,'').trim();
+  const p=state.products.find(x=>(x.name||'').trim().toLowerCase()===cleanN.toLowerCase());
+  let baseName=h.name, baseVals=h.vals, portionG=null;
+  if(p){
+    baseName=p.name;
+    baseVals={}; for(const N of NUTRIENTS) baseVals[N.key]=parseNum(p[N.key]);
+    portionG=parseNum(p.portion);
+  }
+  const res=await portionDialog(baseName,baseVals,portionG,'✔ Użyj');
   if(!res) { $('#fpName').value=h.name; return; }
-  const vals=scaledVals(h.vals,res.f);
-  $('#fpName').value=h.name+res.suffix;
+  const vals=scaledVals(baseVals,res.f);
+  $('#fpName').value=baseName+res.suffix;
   $$('#fpNutriGrid [data-fpn]').forEach(i=>{ const v=vals[i.dataset.fpn]; i.value=v!=null?v:''; });
 });
 $('#fpAddBtn').addEventListener('click',()=>{

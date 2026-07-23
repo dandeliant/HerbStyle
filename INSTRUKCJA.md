@@ -82,7 +82,12 @@ Sześć sekcji: **Śniadanie, Przekąska I, Lunch/Obiad, Przekąska II, Kolacja,
 ### Dodawanie i edycja wpisów
 - **„＋ Dodaj pozycję"** — nowy wiersz z automatyczną bieżącą godziną (możesz ją poprawić). Kolumny: Czas, Co spożyto oraz po jednej kolumnie na każdy śledzony składnik.
 - **Podpowiedzi z historii**: pole opisu podpowiada nazwy WSZYSTKICH posiłków, jakie kiedykolwiek wpisałeś (nie tylko z bazy produktów). Gdy nazwa w pełni pokryje się z historyczną lub z produktem z bazy, **puste wartości odżywcze uzupełniają się same** (toast „✨ Uzupełniono wartości z historii"); ręcznie wpisanych wartości nic nie nadpisuje.
-- **„＋ z bazy produktów…"** — lista rozwijana w każdej sekcji: jedno kliknięcie dodaje produkt z kompletem wartości i bieżącą godziną.
+- **„＋ z bazy produktów…"** — lista rozwijana w każdej sekcji. Po wyborze produktu (a także po kliknięciu produktu lub podpowiedzi z historii w panelu 🍽️) pojawia się dialog **„⚖️ Jaka porcja?"**:
+  - **szybkie mnożniki ×½, ×1, ×1,5, ×2–×6** — kliknięcie od razu dodaje wpis z przemnożonymi wartościami,
+  - **własny mnożnik** (np. 2,5) z podglądem przeliczonych wartości na żywo,
+  - **gramy** — jeśli produkt ma ustawioną „Porcję (g)" (np. wartości na 100 g), wpisujesz zjedzone gramy (np. 20), a wartości przeliczają się same (×0,2),
+  - nazwa wpisu dostaje czytelny sufiks, np. „Ser twarogowy (20 g)" albo „Koktajl proteinowy ×2".
+- **⚖️ na wierszu** (w trybie edycji ✏️) — przelicza istniejący wpis dowolnym mnożnikiem.
 - **Σ Razem** — pod wpisami każdego posiłku wyróżniony wiersz sumuje wszystkie śledzone składniki (aktualizuje się na żywo).
 
 ### Ochrona wpisów — ✏️ Zmień
@@ -152,7 +157,7 @@ Pływające przyciski **↩️ Wstecz** i **↪️ Do przodu** w prawym górnym 
 
 ## 12. Baza produktów
 
-Twoje typowe produkty i posiłki z wartościami odżywczymi (kolumny = śledzone składniki):
+Twoje typowe produkty i posiłki z wartościami odżywczymi (kolumny = śledzone składniki). Kolumna **„Porcja (g)"** określa, ilu gramów dotyczą wartości (np. 100) — dzięki niej przy dodawaniu do dziennika możesz podać zjedzone gramy, a wartości przeliczą się same. Ponadto:
 - dodawanie ręczne (**＋ Dodaj produkt**), przez **⭐** z dziennika albo checkbox w szybkim panelu 🍽️;
 - wiersze są **blokowane** — edycja przez ✏️ / ✅, usuwanie przez ✕;
 - produkty są dostępne w listach „＋ z bazy produktów" w dzienniku i w panelu 🍽️, a ich nazwy uzupełniają wartości przy wpisywaniu.
